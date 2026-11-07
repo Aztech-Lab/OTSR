@@ -1,0 +1,100 @@
+{
+ "meta": {
+  "H": 45,
+  "W": 61,
+  "N": 900,
+  "view": {
+   "zoom": 2.5,
+   "tx": -7.3,
+   "ty": 4.1,
+   "out_w": 100,
+   "out_h": 70
+  },
+  "dtype": "float64 reference"
+ },
+ "arrays": {
+  "params": {
+   "dtype": "float32",
+   "shape": [
+    900,
+    9
+   ],
+   "offset": 0,
+   "count": 8100
+  },
+  "gt": {
+   "dtype": "float32",
+   "shape": [
+    45,
+    61,
+    3
+   ],
+   "offset": 32400,
+   "count": 8235
+  },
+  "out": {
+   "dtype": "float32",
+   "shape": [
+    45,
+    61,
+    3
+   ],
+   "offset": 65344,
+   "count": 8235
+  },
+  "D": {
+   "dtype": "float32",
+   "shape": [
+    45,
+    61
+   ],
+   "offset": 98288,
+   "count": 2745
+  },
+  "loss": {
+   "dtype": "float32",
+   "shape": [
+    1
+   ],
+   "offset": 109280,
+   "count": 1
+  },
+  "grad": {
+   "dtype": "float32",
+   "shape": [
+    900,
+    9
+   ],
+   "offset": 109296,
+   "count": 8100
+  },
+  "terms": {
+   "dtype": "float32",
+   "shape": [
+    900,
+    6
+   ],
+   "offset": 141696,
+   "count": 5400
+  },
+  "support": {
+   "dtype": "float32",
+   "shape": [
+    900,
+    2
+   ],
+   "offset": 163296,
+   "count": 1800
+  },
+  "out_view": {
+   "dtype": "float32",
+   "shape": [
+    70,
+    100,
+    3
+   ],
+   "offset": 170496,
+   "count": 21000
+  }
+ }
+}

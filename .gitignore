@@ -1,0 +1,30 @@
+# dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# test and tool output
+tests/gpu/out/
+tools/out/
+*.rgb.bin
+coverage/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# local fits and exports (users' own images)
+*.otsr
+!tests/golden/*.otsr
+exports/
+
+# editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# sample images (DanbooRegion / Image-GS anime test images, not redistributed here)
+public/samples/

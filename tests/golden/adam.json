@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "H": 30,
+  "W": 50,
+  "N": 64,
+  "steps_total": 10,
+  "iters": 3
+ },
+ "arrays": {
+  "params0": {
+   "dtype": "float32",
+   "shape": [
+    64,
+    9
+   ],
+   "offset": 0,
+   "count": 576
+  },
+  "grads": {
+   "dtype": "float32",
+   "shape": [
+    3,
+    64,
+    9
+   ],
+   "offset": 2304,
+   "count": 1728
+  },
+  "params": {
+   "dtype": "float32",
+   "shape": [
+    3,
+    64,
+    9
+   ],
+   "offset": 9216,
+   "count": 1728
+  },
+  "m": {
+   "dtype": "float32",
+   "shape": [
+    3,
+    64,
+    9
+   ],
+   "offset": 16128,
+   "count": 1728
+  },
+  "v": {
+   "dtype": "float32",
+   "shape": [
+    3,
+    64,
+    9
+   ],
+   "offset": 23040,
+   "count": 1728
+  }
+ }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "otsr",
+  "version": "0.1.0",
+  "description": "OTSR: resolution-independent image upscaling with optimal-transport Gaussian lattices, fitted and rendered in the browser on WebGPU.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build && node tools/copy-docs.mjs",
+    "preview": "vite preview",
+    "serve": "node tools/serve.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tests/tsconfig.json",
+    "test": "vitest run --project unit",
+    "test:gpu": "vitest run --project gpu",
+    "test:all": "vitest run",
+    "smoke": "node tools/smoke-ui.mjs",
+    "bench": "node tools/bench.mjs",
+    "golden": "python reference/make_golden.py",
+    "probe:webgpu": "node tools/webgpu-probe.mjs",
+    "probe:dawn": "node tools/dawn-probe.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@webgpu/types": "0.1.74",
+    "puppeteer-core": "25.14.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.4",
+    "webgpu": "0.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,61 @@
+{
+ "meta": {
+  "H": 40,
+  "W": 48,
+  "N": 180,
+  "steps": 40,
+  "log_steps": [
+   0,
+   10,
+   20,
+   30,
+   40
+  ]
+ },
+ "arrays": {
+  "gt": {
+   "dtype": "float32",
+   "shape": [
+    40,
+    48,
+    3
+   ],
+   "offset": 0,
+   "count": 5760
+  },
+  "params0": {
+   "dtype": "float32",
+   "shape": [
+    180,
+    9
+   ],
+   "offset": 23040,
+   "count": 1620
+  },
+  "params": {
+   "dtype": "float32",
+   "shape": [
+    180,
+    9
+   ],
+   "offset": 29520,
+   "count": 1620
+  },
+  "psnr": {
+   "dtype": "float32",
+   "shape": [
+    5
+   ],
+   "offset": 36000,
+   "count": 5
+  },
+  "loss": {
+   "dtype": "float32",
+   "shape": [
+    5
+   ],
+   "offset": 36032,
+   "count": 5
+  }
+ }
+}

@@ -1,0 +1,22 @@
+{
+ "meta": {
+  "W": 30,
+  "H": 20,
+  "N": 5,
+  "meta": {
+   "generator": "otsr-ref 0.1.0",
+   "note": "golden sample"
+  }
+ },
+ "arrays": {
+  "params": {
+   "dtype": "float32",
+   "shape": [
+    5,
+    9
+   ],
+   "offset": 0,
+   "count": 45
+  }
+ }
+}

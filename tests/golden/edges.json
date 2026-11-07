@@ -1,0 +1,62 @@
+{
+ "meta": {
+  "H": 160,
+  "W": 208,
+  "runs": [
+   {
+    "S": 4.0,
+    "edge_px": 1.4
+   },
+   {
+    "S": 2.5,
+    "edge_px": 0.8
+   },
+   {
+    "S": 8.0,
+    "edge_px": 2.5
+   }
+  ]
+ },
+ "arrays": {
+  "img": {
+   "dtype": "float32",
+   "shape": [
+    160,
+    208,
+    3
+   ],
+   "offset": 0,
+   "count": 99840
+  },
+  "out0": {
+   "dtype": "float32",
+   "shape": [
+    160,
+    208,
+    3
+   ],
+   "offset": 399360,
+   "count": 99840
+  },
+  "out1": {
+   "dtype": "float32",
+   "shape": [
+    160,
+    208,
+    3
+   ],
+   "offset": 798720,
+   "count": 99840
+  },
+  "out2": {
+   "dtype": "float32",
+   "shape": [
+    160,
+    208,
+    3
+   ],
+   "offset": 1198080,
+   "count": 99840
+  }
+ }
+}

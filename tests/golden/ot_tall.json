@@ -1,0 +1,82 @@
+{
+ "meta": {
+  "H": 100,
+  "W": 70,
+  "K": 400,
+  "n_long": 64,
+  "gy": 24,
+  "gx": 17,
+  "lam": 0.28992861352518046,
+  "eps": 0.00054931640625,
+  "iters": 120
+ },
+ "arrays": {
+  "gt": {
+   "dtype": "float32",
+   "shape": [
+    100,
+    70,
+    3
+   ],
+   "offset": 0,
+   "count": 21000
+  },
+  "rho": {
+   "dtype": "float32",
+   "shape": [
+    64,
+    45
+   ],
+   "offset": 84000,
+   "count": 2880
+  },
+  "T": {
+   "dtype": "float32",
+   "shape": [
+    64,
+    45,
+    2
+   ],
+   "offset": 95520,
+   "count": 5760
+  },
+  "T64": {
+   "dtype": "float32",
+   "shape": [
+    64,
+    45,
+    2
+   ],
+   "offset": 118560,
+   "count": 5760
+  },
+  "params": {
+   "dtype": "float32",
+   "shape": [
+    408,
+    9
+   ],
+   "offset": 141600,
+   "count": 3672
+  },
+  "cov": {
+   "dtype": "float32",
+   "shape": [
+    408,
+    3
+   ],
+   "offset": 156288,
+   "count": 1224
+  },
+  "J": {
+   "dtype": "float32",
+   "shape": [
+    408,
+    2,
+    2
+   ],
+   "offset": 161184,
+   "count": 1632
+  }
+ }
+}
