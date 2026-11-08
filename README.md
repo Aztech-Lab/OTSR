@@ -77,6 +77,16 @@ Measured on an RTX 4090 (Windows, D3D12, Dawn in Node) with the default settings
 0.1 Gaussians per pixel: initialisation 0.5 s, fit 5.3 s (565 steps/s, 52.7 dB), 4× export (8192 × 8192, with
 edges) 1.3 s. Details and the memory model in [docs/performance.md](docs/performance.md).
 
+## Versions
+
+| Version | What it brought |
+|---|---|
+| **0.1.2** | The extras and the **vector view**: the model in Gaussian-id colours, the fit animation (OT lattice → Gaussians → scan reveal), the monitor panel, the View menu (vector / OT lattice / outlines / error map), export as PNG / JPEG / WebP / AVIF / BMP, a process log, notices in the status strip, bilingual labels, starlight and geometry on the stage, the way back to the start screen. |
+| **0.1.1** | **Research mode**: custom budget and steps, edge width, L1 / L2 loss, view modes and split against any resampler, 1σ outlines, error map, region tool, session info with the PSNR curve. |
+| **0.1.0** | First public version: the WebGPU engine and the UI in the lab-white / copper design, the `.otsr` format, the Python reference and the golden tests. |
+
+Details per version are in [CHANGELOG.md](CHANGELOG.md).
+
 ## Documentation
 
 [docs/index.md](docs/index.md) — getting started, the method, the engine, the `.otsr` format, testing,

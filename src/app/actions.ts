@@ -181,7 +181,7 @@ export class Actions {
         const last = res.curve[res.curve.length - 1];
         model.cpu = res.params;
         model.meta = {
-          generator: 'otsr-web 0.1.0', source: img.name, width: img.W, height: img.H, count: model.N, preset: s.state.prefs.preset,
+          generator: 'otsr-web 0.1.2', source: img.name, width: img.W, height: img.H, count: model.N, preset: s.state.prefs.preset,
           k_per_px: kPerPx, steps: last?.step ?? 0, psnr: last?.psnr, seconds: res.seconds, adapter: this.ctx.info.description, loss,
         };
         const summary: FitSummary = { psnr: last?.psnr ?? 0, seconds: res.seconds, steps: last?.step ?? 0, count: model.N, cancelled: res.cancelled };
