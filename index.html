@@ -10,7 +10,28 @@
 </head>
 <body data-mode="simple" class="empty">
   <div id="stage">
-    <div class="bg" aria-hidden="true"><i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i><canvas id="stars"></canvas></div>
+    <div class="bg" aria-hidden="true">
+      <i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i>
+      <svg class="geo" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1">
+        <g class="dial"><circle cx="180" cy="820" r="300" stroke-dasharray="2 12" opacity="0.55"/><circle cx="180" cy="820" r="240" stroke-width="16" stroke-dasharray="1 29" opacity="0.3"/></g>
+        <circle cx="180" cy="820" r="200" opacity="0.3"/>
+        <path d="M180 520 a300 300 0 0 1 212 88" stroke-width="3" class="copper" opacity="0.5"/>
+        <path d="M180 600 v24 M400 820 h-24 M180 1040 v-24" opacity="0.5"/>
+        <g class="reticle"><circle cx="150" cy="300" r="54" stroke-dasharray="30 10" opacity="0.5"/></g>
+        <circle cx="150" cy="300" r="28" opacity="0.35"/>
+        <path d="M150 226 v22 M150 352 v22 M76 300 h22 M202 300 h22" opacity="0.5"/>
+        <path d="M60 210 h20 M60 210 v20 M240 210 h-20 M240 210 v20 M60 390 h20 M60 390 v-20 M240 390 h-20 M240 390 v-20" stroke-width="2" class="copper" opacity="0.45"/>
+        <g class="orbit"><circle cx="1460" cy="640" r="150" stroke-dasharray="50 16" opacity="0.4"/></g>
+        <circle cx="1460" cy="640" r="110" opacity="0.3"/>
+        <circle cx="1460" cy="640" r="6" class="copper" opacity="0.5"/>
+        <path d="M1460 470 v24 M1460 786 v24 M1290 640 h24 M1606 640 h24" opacity="0.45"/>
+        <path d="M-80 60 a520 520 0 0 1 560 420" stroke-dasharray="4 10" opacity="0.35"/>
+        <circle cx="1300" cy="930" r="70" stroke-dasharray="2 8" opacity="0.45"/>
+        <path d="M1210 840 h24 M1210 840 v24 M1390 840 h-24 M1390 840 v24 M1210 1020 h24 M1210 1020 v-24 M1390 1020 h-24 M1390 1020 v-24" stroke-width="2" class="copper" opacity="0.4"/>
+        <circle cx="820" cy="-120" r="260" stroke-dasharray="3 9" opacity="0.4"/>
+      </svg>
+      <canvas id="stars"></canvas>
+    </div>
     <canvas id="view"></canvas>
     <canvas id="overlay" aria-hidden="true"></canvas>
     <div class="vignette" aria-hidden="true"></div>

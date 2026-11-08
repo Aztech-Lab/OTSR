@@ -28,3 +28,6 @@ Thumbs.db
 
 # sample images (DanbooRegion / Image-GS anime test images, not redistributed here)
 public/samples/
+
+# local caches (sample sets, screenshots)
+_cache/
