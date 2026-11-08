@@ -89,6 +89,7 @@ a:hover { color: var(--copper); }
 .bg .r1 { width: 78vmin; height: 78vmin; right: -14vmin; top: -10vmin; border-style: dashed; animation: spin 260s linear infinite; }
 .bg .r2 { width: 46vmin; height: 46vmin; right: 2vmin; top: 6vmin; border-width: 2px; opacity: 0.18; animation: spin 180s linear infinite reverse; }
 #stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+body.no-stars #stars { display: none; }
 /* more of the instrument's circle geometry, scattered over the stage: dials with ticks, reticles, orbits, brackets */
 .bg .geo { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--faint); opacity: 0.9; }
 .bg .geo .copper { stroke: var(--copper); }

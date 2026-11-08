@@ -70,6 +70,8 @@ export interface Prefs {
   motion: boolean;
   /** The fit animation (OT lattice, watercolour, scan reveal); off = live render while fitting. */
   fitAnim: boolean;
+  /** The starlight over the stage. */
+  stars: boolean;
   /** The control console on the left is open. */
   panelLeft: boolean;
   /** Measured Gaussian-steps per second of this machine, for time estimates (0 = unknown). */
@@ -150,6 +152,7 @@ export const DEFAULT_PREFS: Prefs = {
   theme: 'light',
   motion: true,
   fitAnim: true,
+  stars: true,
   panelLeft: true,
   throughput: 0,
   sections: {},

@@ -50,8 +50,9 @@ export class Stars {
   private key = '';
   private frame = 0;
   private wasMoving = true;
+  private wasEnabled = true;
 
-  constructor(readonly canvas: HTMLCanvasElement, private readonly motion: () => boolean) {
+  constructor(readonly canvas: HTMLCanvasElement, private readonly motion: () => boolean, private readonly enabled: () => boolean = () => true) {
     const g = canvas.getContext('2d');
     if (!g) throw new Error('2D background unavailable');
     this.g = g;
@@ -83,6 +84,14 @@ export class Stars {
 
   private tick(t: number): void {
     if (document.hidden) return;
+    const on = this.enabled();
+    if (!on) {
+      if (this.wasEnabled) this.g.clearRect(0, 0, this.w, this.h);
+      this.wasEnabled = false;
+      this.schedule();
+      return;
+    }
+    if (!this.wasEnabled) { this.wasEnabled = true; this.wasMoving = true; this.last = 0; }
     const moving = this.motion();
     if (moving) {
       if (t - this.last >= 1000 / FPS) { const dt = this.last ? Math.min(0.1, (t - this.last) / 1000) : 0; this.last = t; this.draw(t / 1000, dt); }

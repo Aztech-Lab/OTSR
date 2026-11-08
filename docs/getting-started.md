@@ -71,7 +71,8 @@ run along the top and left edge of the image and the status strip shows the sour
 is clipped to the image, so the slowly moving stage shows around it when zoomed out. The *GPU mem* readout is an
 estimate from the engine's allocations before the fit and the allocated figure afterwards. Errors open a dialog; other
 notices show as a chip in the middle of the status strip, which also keeps the last status message. The light / dark
-button sits at the top right; *System* follows the OS theme.
+button sits at the top right; *System* follows the OS theme. The settings also switch the starlight over the stage, the
+fit animation and all decorative motion off.
 
 **Research** — the same workflow with every parameter exposed and the analysis tools:
 

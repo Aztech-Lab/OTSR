@@ -156,7 +156,7 @@ async function boot(): Promise<void> {
 
   const viewer = new Viewer($('view'), $('overlay'), ctx, pipes, $('stage')); // pointer events on the whole stage
   const view = $('view');
-  new Stars($<HTMLCanvasElement>('stars'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches);
+  new Stars($<HTMLCanvasElement>('stars'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches, () => store.state.prefs.stars !== false);
   const zoombar = $('toolbar');
   // keep the fitted image clear of the console (left), the monitor (right), the command block (top) and the bottom bars
   const setInsets = () => {
@@ -372,6 +372,10 @@ async function boot(): Promise<void> {
   const anim = $<HTMLInputElement>('anim-toggle');
   anim.checked = store.state.prefs.fitAnim !== false;
   anim.addEventListener('change', () => store.setPrefs({ fitAnim: anim.checked }));
+  const starsToggle = $<HTMLInputElement>('stars-toggle');
+  const applyStars = () => { starsToggle.checked = store.state.prefs.stars !== false; document.body.classList.toggle('no-stars', store.state.prefs.stars === false); };
+  applyStars();
+  starsToggle.addEventListener('change', () => { store.setPrefs({ stars: starsToggle.checked }); applyStars(); });
   const syncMode = radioTabs<Mode>($('mode-seg'), 'set-mode', [['simple', 'Simple · 簡單'], ['research', 'Research · 科研']], () => store.state.prefs.mode, (m) => store.setPrefs({ mode: m }));
   const help = $<HTMLDialogElement>('help');
   $('help-table').replaceChildren(...SHORTCUTS.map(([k, d]) => h('tr', null, h('td', null, ...k.split(' / ').flatMap((p, i) => [i ? ' / ' : '', h('span', { class: 'key' }, p)])), h('td', null, d))));
