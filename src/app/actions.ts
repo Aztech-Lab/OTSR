@@ -2,10 +2,11 @@
 // the job runner, so only one thing runs at a time and every failure is reported the same way.
 
 import { decodeOtsr, encodeOtsr } from '../core/fileformat';
-import { otInit, readBuffer, renderImage, runFit, uploadBuffer, type GpuContext, type Pipelines } from '../engine';
+import { otInit, renderImage, runFit, uploadBuffer, type GpuContext, type Pipelines } from '../engine';
 import { fmtBytes, fmtInt, fmtSeconds } from './dom';
 import type { FitShow } from './fitshow';
 import type { Monitor } from './monitor';
+import type { VectorView } from './vectorview';
 import { MAX_PIXELS, WARN_PIXELS, decodeImageFile, downloadBlob, encodePng, imageFromRgba8, stem, type LoadedImage } from './image';
 import type { JobRunner } from './jobs';
 import { effectiveSettings, gaussianCount } from './presets';
@@ -43,6 +44,7 @@ export class Actions {
   /** The fit animation and the monitor panel, attached by main.ts once the DOM exists. */
   show: FitShow | null = null;
   monitor: Monitor | null = null;
+  vectorView: VectorView | null = null;
 
   constructor(readonly store: Store, readonly ctx: GpuContext, readonly pipes: Pipelines, readonly viewer: Viewer, readonly jobs: JobRunner) {}
 
@@ -68,6 +70,8 @@ export class Actions {
 
   setImage(img: LoadedImage): void {
     const s = this.store;
+    // re-checked here, after any decode await: a job started meanwhile still holds the model's buffers
+    if (s.busy) return void toast('Wait for the current job to finish.', 'info', 3000);
     s.state.sourceBuf?.destroy();
     const sourceBuf = uploadBuffer(this.ctx.device, img.rgba, GPUBufferUsage.STORAGE, 'source');
     if (s.state.model && (s.state.model.W !== img.W || s.state.model.H !== img.H)) this.dropModel();
@@ -85,6 +89,7 @@ export class Actions {
 
   dropModel(): void {
     const s = this.store;
+    this.vectorView?.release(); // its recoloured copy binds the parameters about to be destroyed
     this.viewer.setModel(null);
     this.viewer.setErrorMap(null);
     s.state.model?.params.destroy();
@@ -114,9 +119,11 @@ export class Actions {
     const loss = s.state.prefs.loss ?? 'l2';
     const prefs = s.state.prefs;
     const show = prefs.fitAnim !== false && prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches ? this.show : null;
-    s.set({ live: null, curve: [], errorStats: null, monitor: true, fitEntries: 0 });
+    this.vectorView?.release();
+    s.set({ live: null, curve: [], errorStats: null, monitor: true, fitEntries: 0, layers: { ...s.state.layers, vector: false } });
+    this.viewer.layers = { ...this.viewer.layers, vector: false };
     this.viewer.setErrorMap(null);
-    this.monitor?.reset(img.W, img.H);
+    this.monitor?.reset(img.W, img.H, img.rgb);
     const summary = await this.jobs.run('Fit', async ({ signal, progress }) => {
       const t0 = performance.now();
       show?.start(img.W, img.H);
@@ -131,31 +138,27 @@ export class Actions {
           },
           onStage: (T, k, n, eps, grid) => {
             show?.otStage(T, grid);
-            if (k % 4 === 0 || k === n - 1) progress(-1, `OT ε-scaling stage ${k + 1} / ${n} · ε = ${eps.toExponential(1)}`);
+            progress(-1, `OT ε-scaling stage ${k + 1} / ${n} · ε = ${eps.toExponential(1)}`);
           },
         });
         show?.otDone();
         if (signal.aborted) return { psnr: 0, seconds: 0, steps: 0, count: init.count, cancelled: true };
         const model = this.setModel(init.params, img.W, img.H, {}, false);
+        model.ot = { T: init.T, grid: init.grid };
+        show?.attachModel(model);
+        if (show?.displayBuffer) this.monitor?.setVectorSource(show.displayBuffer, (enc) => show.encodeRecolour(enc));
         s.setStatus(`Initialised ${fmtInt(init.count)} Gaussians in ${fmtSeconds((performance.now() - t0) / 1000)}; fitting …`);
         progress(-1, `Uploaded ${fmtInt(model.N)} × 9 parameters (${fmtBytes(model.N * 36)}) · Adam moments cleared · ${loss.toUpperCase()} loss`);
+        progress(-1, `Optimising · ${fmtInt(steps)} steps · progress every 50 steps`);
         this.viewer.compare = s.state.prefs.compare === 'split';
         this.viewer.requestRender();
-        // snapshots of the parameters while the optimiser runs: the animation and the monitor read them
+        // the monitor's crops follow the optimiser at a fixed cadence
         let fitting = true;
-        const bytes = model.N * 36;
         const snapLoop = (async () => {
           while (fitting) {
             await new Promise((r) => setTimeout(r, SNAPSHOT_MS));
             if (!fitting || s.state.model !== model) break;
-            try {
-              const p = new Float32Array(await readBuffer(this.ctx.device, model.params, bytes));
-              if (!fitting) break;
-              show?.snapshot(p);
-              this.monitor?.update(p);
-            } catch {
-              break;
-            }
+            await this.monitor?.renderCrops();
           }
         })();
         const res = await runFit(this.ctx, this.pipes, { buffer: model.params, count: model.N }, img.W, img.H, img.rgba, {
@@ -167,7 +170,7 @@ export class Actions {
           onProgress: (p) => {
             const rate = p.step / Math.max(1e-3, p.elapsedMs / 1000);
             const left = p.step > 0 ? (p.steps - p.step) / rate : NaN;
-            progress(p.step / p.steps, `Step ${fmtInt(p.step)} / ${fmtInt(p.steps)} · ${p.psnr.toFixed(2)} dB · ${rate.toFixed(0)} it/s${p.step > 0 ? ` · ~${fmtSeconds(left)} left` : ''}`);
+            progress(p.step / p.steps, `Step ${fmtInt(p.step)} / ${fmtInt(p.steps)} · ${p.psnr.toFixed(2)} dB · ${rate.toFixed(0)} it/s${p.step > 0 ? ` · ~${fmtSeconds(left)} left` : ''}`, true);
             s.set({ live: { step: p.step, steps: p.steps, psnr: p.psnr, rate, left }, curve: [...s.state.curve, { step: p.step, psnr: p.psnr }] });
             this.viewer.requestRender();
           },
@@ -183,23 +186,22 @@ export class Actions {
         };
         const summary: FitSummary = { psnr: last?.psnr ?? 0, seconds: res.seconds, steps: last?.step ?? 0, count: model.N, cancelled: res.cancelled };
         if (!res.cancelled && res.seconds > 0.2) s.setPrefs({ throughput: (model.N * steps) / res.seconds });
-        progress(1, `Read back ${fmtInt(model.N)} Gaussians (${fmtBytes(bytes)}) · tile entries ${fmtInt(res.entries)}, capacity ${fmtInt(res.entryCap)}`);
+        progress(1, `Read back ${fmtInt(model.N)} Gaussians (${fmtBytes(model.N * 36)}) · tile entries ${fmtInt(res.entries)}, capacity ${fmtInt(res.entryCap)}`);
         progress(1, `Edge pass ready · distance field ${(s.state.prefs.edgePx ?? 1.4).toFixed(1)} px from 1.5× (view and export)`);
         s.set({ lastFit: summary, model, live: null, fitEntries: res.entries });
-        this.monitor?.update(res.params);
         s.setStatus(`${res.cancelled ? 'Fit stopped' : 'Fit finished'}: ${summary.psnr.toFixed(2)} dB after ${fmtInt(summary.steps)} steps in ${fmtSeconds(res.seconds)}. Drag the divider to compare; zoom in to inspect.`);
         if (!res.cancelled) toast(`Fitted ${fmtInt(model.N)} Gaussians — ${summary.psnr.toFixed(2)} dB in ${fmtSeconds(res.seconds)}`, 'success');
         this.viewer.requestRender();
         if (show?.active) {
           if (res.cancelled) show.cancel();
           else {
-            if (!show.hasSnapshot) show.snapshot(res.params);
             progress(1, `Scan reveal · ${summary.psnr.toFixed(2)} dB`);
             await show.finish();
           }
         } else if (!res.cancelled && s.state.prefs.motion !== false) this.viewer.sweepSplit();
         return summary;
       } finally {
+        this.monitor?.setVectorSource(null, null); // crops back on the model's own buffer before the copy is destroyed
         show?.cancel();
       }
     });
@@ -210,12 +212,17 @@ export class Actions {
 
   // ---- research layers -----------------------------------------------------------------------------------------
 
-  /** Switches an analysis layer on or off (the error map is computed on first use). */
+  /** Switches a view layer on or off (the error map is computed on first use; the vector view needs a model). */
   setLayer(name: keyof Layers, on: boolean): void {
+    if (name === 'vector') {
+      if (on && (!this.store.state.model || this.store.busy)) return void toast(this.store.busy ? 'The vector view is shown by the fit itself; toggle it afterwards.' : 'Fit a model first.', 'info', 3000);
+      on = this.vectorView?.set(on) ?? false;
+    }
     const layers = { ...this.store.state.layers, [name]: on };
     this.store.set({ layers });
     this.viewer.layers = layers;
     if (name === 'error' && on && !this.viewer.hasErrorMap) void this.refreshErrorMap();
+    else if (name === 'vector') this.viewer.requestRender();
     else this.viewer.refreshOverlay();
   }
 
@@ -282,7 +289,7 @@ export class Actions {
       const t0 = performance.now();
       const img = await renderImage(this.ctx, this.pipes, m.params, m.N, m.W, m.H, scale, {
         edges, edge: { edgePx }, signal,
-        onProgress: (d, t) => progress(d / (t + 1), `Rendering ${W} × ${H} — tile ${d} / ${t}`),
+        onProgress: (d, t) => progress(d / (t + 1), `Rendering ${W} × ${H} — tile ${d} / ${t}`, true),
       });
       progress(0.95, `Encoding PNG (${W} × ${H}) …`);
       const blob = await encodePng(img.rgba, img.width, img.height);
@@ -310,6 +317,7 @@ export class Actions {
     if (s.busy) return void toast('Wait for the current job to finish.', 'info', 3000);
     try {
       const m = decodeOtsr(await file.arrayBuffer());
+      if (s.busy) return void toast('Wait for the current job to finish.', 'info', 3000); // a job may have started during the read
       if (s.state.image && (s.state.image.W !== m.W || s.state.image.H !== m.H)) {
         s.state.sourceBuf?.destroy();
         s.set({ image: null, sourceBuf: null });
@@ -370,6 +378,7 @@ export class Actions {
 
   /** Loads raw pixels (scripting / tests). */
   loadRgba(rgba8: Uint8ClampedArray | number[], W: number, H: number, name = 'script.png'): void {
+    if (this.store.busy) throw new Error('Wait for the current job to finish.');
     if (W * H > MAX_PIXELS) throw new Error('too large');
     this.setImage(imageFromRgba8(rgba8 instanceof Uint8ClampedArray ? rgba8 : new Uint8ClampedArray(rgba8), W, H, name));
   }

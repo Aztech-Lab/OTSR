@@ -78,7 +78,7 @@ export class Rasterizer {
   constructor(
     readonly ctx: GpuContext,
     readonly pipes: Pipelines,
-    readonly params: GPUBuffer,
+    public params: GPUBuffer,
     readonly count: number,
     readonly outW: number,
     readonly outH: number,
@@ -119,6 +119,12 @@ export class Rasterizer {
     this.bgFwd = bindGroup(d, this.pipes.forward, { 0: this.viewBuf, 1: this.splats, 2: this.tileStart, 3: this.tileList, 4: this.out }, 'forward');
     this.entryVersion++;
     if (this.view) this.writeView();
+  }
+
+  /** Rebinds the parameter buffer (same Gaussian count), e.g. a display-only recoloured copy. */
+  setParams(params: GPUBuffer): void {
+    this.params = params;
+    this.bgPre = bindGroup(this.device, this.pipes.preprocess, { 0: this.viewBuf, 1: params, 2: this.splats, 3: this.rects, 4: this.gcount, 5: this.tileCount }, 'preprocess');
   }
 
   /** Grows the tile-entry capacity (keeps the larger of `cap` and the current capacity). */

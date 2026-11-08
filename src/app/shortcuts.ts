@@ -16,7 +16,8 @@ export const SHORTCUTS: [string, string][] = [
   ['0', 'Fit the image to the view'],
   ['1 / 2 / 4 / 8', '100 % / 200 % / 400 % / 800 %'],
   ['M', 'Region tool'],
-  ['G / D', 'Research layers: Gaussian outlines / error map'],
+  ['V / T', 'View: Gaussian-id colours (vector view) / OT lattice overlay'],
+  ['G / D', 'View: Gaussian outlines / error map'],
   ['Arrow keys', 'Nudge the region (Shift: 10 px)'],
   ['Space (hold)', 'Pan while in the region tool'],
   ['?', 'This list'],
@@ -73,8 +74,10 @@ export function installShortcuts(store: Store, actions: Actions, viewer: Viewer,
       case '4': viewer.zoomAbout(4); break;
       case '8': viewer.zoomAbout(8); break;
       case 'm': case 'M': actions.setTool(s.tool === 'roi' ? 'pan' : 'roi'); break;
-      case 'g': case 'G': if (s.prefs.mode === 'research') actions.setLayer('gaussians', !s.layers.gaussians); break;
-      case 'd': case 'D': if (s.prefs.mode === 'research') actions.setLayer('error', !s.layers.error); break;
+      case 'g': case 'G': actions.setLayer('gaussians', !s.layers.gaussians); break;
+      case 'd': case 'D': actions.setLayer('error', !s.layers.error); break;
+      case 'v': case 'V': actions.setLayer('vector', !s.layers.vector); break;
+      case 't': case 'T': actions.setLayer('ot', !s.layers.ot); break;
       case '?': toggleHelp(); break;
       default: return;
     }

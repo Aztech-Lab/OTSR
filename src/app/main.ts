@@ -1,10 +1,11 @@
-// OTSR web UI entry point: starts WebGPU, builds the viewer, the console, the monitor, the command block and the
-// shortcuts, exposes window.otsr.
+// OTSR web UI entry point: starts WebGPU, builds the viewer, the console, the monitor, the command block, the view
+// menu and the shortcuts, exposes window.otsr.
 
 import { acquireDevice, createPipelines, renderImage, type GpuContext, type Pipelines } from '../engine';
 import { encodeOtsr } from '../core/fileformat';
 import { Actions } from './actions';
-import { fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
+import { BgField } from './bgfield';
+import { bi, fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
 import { FitShow } from './fitshow';
 import { JobRunner } from './jobs';
 import { Monitor } from './monitor';
@@ -13,6 +14,7 @@ import { effectiveSettings, fitMemoryBytes, fitSecondsEstimate, gaussianCount } 
 import { SHORTCUTS, installShortcuts } from './shortcuts';
 import { Store, type Layers, type Mode, type Theme } from './store';
 import { toast } from './toast';
+import { VectorView } from './vectorview';
 import { Viewer } from './viewer';
 import '../style.css';
 
@@ -26,6 +28,12 @@ const ZOOM_STOPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32];
 const PROGRESS_CELLS = 24;
 const CONSOLE_W = 400 + 40 + 40; // console width + margins = left inset while it is open
 const MONITOR_W = 320 + 40 + 24;
+const LAYER_ROWS: [keyof Layers, string, string, string][] = [
+  ['vector', 'Vector view', '矢量視角', 'every Gaussian in a random colour × its luma (V)'],
+  ['ot', 'OT lattice', '傳輸網格', 'the transport lattice of the initialisation over the image (T)'],
+  ['gaussians', 'Gaussians 1σ', '高斯輪廓', 'outline of every Gaussian in its own colour, from 2× zoom (G)'],
+  ['error', 'Error map', '誤差圖', '|model − source| per pixel, inferno scale (D)'],
+];
 
 function applyLook(theme: Theme, motion: boolean): void {
   if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -84,13 +92,26 @@ async function boot(): Promise<void> {
   const segCount = $('seg-count');
   const segCells = Array.from({ length: 12 }, () => h('i'));
   segCount.replaceChildren(...segCells);
+  // entering the canvas: the instrument collapses, the image irises open, brackets and panels fly in (CSS, body.entering)
+  let wasEmpty = true;
+  let enterTimer = 0;
+  const enter = () => {
+    document.body.classList.remove('entering');
+    void document.body.offsetWidth; // restart the animations
+    document.body.classList.add('entering');
+    clearTimeout(enterTimer);
+    enterTimer = window.setTimeout(() => document.body.classList.remove('entering'), 1600);
+  };
   store.subscribe((s, changed) => {
     if (changed.has('status')) {
       status.textContent = s.status.text;
       status.classList.toggle('error', s.status.error);
     }
     statusDot.className = `sq ${s.job ? 'blink' : s.status.error ? 'err' : 'ok'}`;
-    document.body.classList.toggle('empty', !s.image && !s.model);
+    const empty = !s.image && !s.model;
+    if (wasEmpty && !empty) enter();
+    wasEmpty = empty;
+    document.body.classList.toggle('empty', empty);
     document.body.classList.toggle('has-fit', !!s.lastFit && !s.job);
     readoutValue.textContent = s.lastFit ? s.lastFit.psnr.toFixed(2) : '—';
     readoutSub.textContent = s.lastFit ? `${s.lastFit.count.toLocaleString('en-US')} GAUSSIANS // ${s.lastFit.steps.toLocaleString('en-US')} STEPS // ${(s.lastFit.seconds).toFixed(1)} S` : '';
@@ -133,8 +154,9 @@ async function boot(): Promise<void> {
   gpuName.title = `${info.vendor} ${info.architecture} ${info.device}${info.isFallback ? ' — software fallback!' : ''}`;
   if (info.isFallback) toast('WebGPU is running on a software fallback adapter; fits will be very slow.', 'error');
 
-  const viewer = new Viewer($('view'), $('overlay'), ctx, pipes);
+  const viewer = new Viewer($('view'), $('overlay'), ctx, pipes, $('stage')); // pointer events on the whole stage
   const view = $('view');
+  new BgField($<HTMLCanvasElement>('bgfield'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches);
   const zoombar = $('toolbar');
   // keep the fitted image clear of the console (left), the monitor (right), the command block (top) and the bottom bars
   const setInsets = () => {
@@ -160,10 +182,12 @@ async function boot(): Promise<void> {
   viewer.compareWith = store.state.prefs.compareWith;
   const jobs = new JobRunner(store);
   const actions = new Actions(store, ctx, pipes, viewer, jobs);
-  const show = new FitShow(viewer);
+  const show = new FitShow(viewer, ctx, pipes);
   const monitor = new Monitor($('monitor-body'), ctx, pipes, viewer, store);
+  const vectorView = new VectorView(viewer, ctx, pipes, store);
   actions.show = show;
   actions.monitor = monitor;
+  actions.vectorView = vectorView;
   new Panel($('panel'), store, actions, viewer);
 
   // zoom navigation: tick marks for the zoom stops, the nearest one raised
@@ -217,6 +241,19 @@ async function boot(): Promise<void> {
   const tbRoi = $('tb-roi');
   tbRoi.addEventListener('click', () => actions.setTool(store.state.tool === 'roi' ? 'pan' : 'roi'));
 
+  // the view menu: the four layers, from the toolbar
+  const tbView = $('tb-view');
+  const viewMenu = $('viewmenu');
+  const layerInputs = LAYER_ROWS.map(([key, en, zh, sub]) => {
+    const input = h('input', { type: 'checkbox', onChange: () => actions.setLayer(key, input.checked) });
+    viewMenu.append(h('label', { class: 'switch' }, h('span', { class: 'lab' }, en, h('i', { class: 'zh' }, zh), h('small', null, sub)), input, h('span', { class: 'tg' })));
+    return [key, input] as const;
+  });
+  const closeMenu = () => { viewMenu.hidden = true; };
+  tbView.addEventListener('click', () => { viewMenu.hidden = !viewMenu.hidden; });
+  document.addEventListener('pointerdown', (e) => { if (!viewMenu.hidden && !viewMenu.contains(e.target as Node) && e.target !== tbView && !tbView.contains(e.target as Node)) closeMenu(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !viewMenu.hidden) { closeMenu(); e.stopImmediatePropagation(); } }, true);
+
   // the command block at the top centre: the one action when idle, the live readout while a job runs
   const cmdIdle = $('cmd-idle');
   const cmdLive = $('cmd-live');
@@ -236,12 +273,16 @@ async function boot(): Promise<void> {
   liveProgress.replaceChildren(...liveCells);
   cmdFit.addEventListener('click', () => void actions.fit());
   $('cmd-stop').addEventListener('click', () => jobs.cancel());
+  let fitLabelMode: Mode | null = null;
   store.subscribe((s) => {
     const busy = !!s.job;
     cmdIdle.hidden = busy;
     cmdLive.hidden = !busy;
     cmdFit.disabled = !s.image;
-    cmdFitLabel.textContent = s.prefs.mode === 'research' ? 'Fit' : 'Enhance';
+    if (fitLabelMode !== s.prefs.mode) {
+      fitLabelMode = s.prefs.mode;
+      cmdFitLabel.replaceChildren(...(s.prefs.mode === 'research' ? bi('Fit', '擬合') : bi('Enhance', '增強')).childNodes);
+    }
     if (s.image) {
       const { kPerPx, steps } = effectiveSettings(s.prefs);
       const N = gaussianCount(kPerPx, s.image.W, s.image.H);
@@ -251,7 +292,7 @@ async function boot(): Promise<void> {
     if (busy) {
       const job = s.job!;
       const live = s.live;
-      liveTitle.textContent = job.name === 'Fit' ? (s.prefs.mode === 'research' ? 'Fitting' : 'Enhancing') : job.name;
+      liveTitle.textContent = job.name === 'Fit' ? (s.prefs.mode === 'research' ? 'Fitting · 擬合中' : 'Enhancing · 增強中') : job.name;
       liveStep.textContent = live ? `STEP ${fmtInt(live.step)} / ${fmtInt(live.steps)}` : job.fraction >= 0 ? `${Math.round(job.fraction * 100)} %` : '';
       liveNums.hidden = !live;
       if (live) {
@@ -269,9 +310,9 @@ async function boot(): Promise<void> {
   });
 
   // panels: the console collapses to a tab on the left; the monitor opens during fits and from a tab on the right
-  $('console-collapse').addEventListener('click', () => store.setPrefs({ panelLeft: false }));
+  $('console-bookmark').addEventListener('click', () => store.setPrefs({ panelLeft: false }));
   $('left-tab').addEventListener('click', () => store.setPrefs({ panelLeft: true }));
-  $('monitor-collapse').addEventListener('click', () => store.set({ monitor: false }));
+  $('monitor-bookmark').addEventListener('click', () => store.set({ monitor: false }));
   $('right-tab').addEventListener('click', () => store.set({ monitor: true }));
 
   // system navigation, the theme button and the settings
@@ -293,14 +334,14 @@ async function boot(): Promise<void> {
   const settings = $<HTMLDialogElement>('settings');
   $('settings-btn').addEventListener('click', () => settings.showModal());
   $('settings-close').addEventListener('click', () => settings.close());
-  const syncTheme = radioTabs<Theme>($('theme-seg'), 'set-theme', [['light', 'Light'], ['dark', 'Dark'], ['auto', 'System']], () => store.state.prefs.theme, setTheme);
+  const syncTheme = radioTabs<Theme>($('theme-seg'), 'set-theme', [['light', 'Light · 淺色'], ['dark', 'Dark · 深色'], ['auto', 'System · 系統']], () => store.state.prefs.theme, setTheme);
   const motion = $<HTMLInputElement>('motion-toggle');
   motion.checked = store.state.prefs.motion !== false;
   motion.addEventListener('change', () => { store.setPrefs({ motion: motion.checked }); applyLook(store.state.prefs.theme, motion.checked); });
   const anim = $<HTMLInputElement>('anim-toggle');
   anim.checked = store.state.prefs.fitAnim !== false;
   anim.addEventListener('change', () => store.setPrefs({ fitAnim: anim.checked }));
-  const syncMode = radioTabs<Mode>($('mode-seg'), 'set-mode', [['simple', 'Simple'], ['research', 'Research']], () => store.state.prefs.mode, (m) => store.setPrefs({ mode: m }));
+  const syncMode = radioTabs<Mode>($('mode-seg'), 'set-mode', [['simple', 'Simple · 簡單'], ['research', 'Research · 科研']], () => store.state.prefs.mode, (m) => store.setPrefs({ mode: m }));
   const help = $<HTMLDialogElement>('help');
   $('help-table').replaceChildren(...SHORTCUTS.map(([k, d]) => h('tr', null, h('td', null, ...k.split(' / ').flatMap((p, i) => [i ? ' / ' : '', h('span', { class: 'key' }, p)])), h('td', null, d))));
   const toggleHelp = () => (help.open ? help.close() : help.showModal());
@@ -316,6 +357,8 @@ async function boot(): Promise<void> {
     tbSplit.toggleAttribute('disabled', !s.model || !s.sourceBuf);
     tbRoi.classList.toggle('active', s.tool === 'roi');
     tbRoi.hidden = s.prefs.mode !== 'research';
+    for (const [key, input] of layerInputs) input.checked = s.layers[key];
+    tbView.classList.toggle('active', Object.values(s.layers).some(Boolean));
     document.body.dataset.mode = s.prefs.mode;
     document.body.classList.toggle('busy', !!s.job);
     document.body.classList.toggle('left-closed', s.prefs.panelLeft === false);
@@ -355,13 +398,16 @@ async function boot(): Promise<void> {
   $('empty-open').addEventListener('click', () => picker.click());
   installShortcuts(store, actions, viewer, () => picker.click(), toggleHelp);
 
-  // sample images, when the build ships them
+  // sample images, when the build ships them: the Load-sample button loads the one chosen in the select
   void actions.sampleList().then((list) => {
     if (!list.length) return;
     const box = $('empty-samples');
     const sel = h('select', { 'aria-label': 'Sample image' }, ...list.map((e) => h('option', { value: e.file }, `${e.file} (${e.w} × ${e.h})`)));
-    box.replaceChildren(sel, h('button', { class: 'textbtn', onClick: () => void actions.loadSample(sel.value) }, 'Load sample →'));
+    box.replaceChildren(h('span', { class: 'micro' }, 'Sample · 樣本'), sel);
     box.hidden = false;
+    const btn = $('empty-sample');
+    btn.hidden = false;
+    btn.addEventListener('click', () => void actions.loadSample(sel.value));
   });
 
   // device loss

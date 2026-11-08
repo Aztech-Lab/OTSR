@@ -15,6 +15,10 @@ export type Loss = 'l2' | 'l1';
 export interface Layers {
   gaussians: boolean;
   error: boolean;
+  /** The model in Gaussian-id colours (random colour x luma per Gaussian). */
+  vector: boolean;
+  /** The optimal-transport lattice of the initialisation over the image. */
+  ot: boolean;
 }
 
 /** The running fit, for the live readout. */
@@ -80,6 +84,8 @@ export interface AppModel {
   meta: Record<string, unknown>;
   /** True once the model was exported or saved (used for the unsaved-work hint). */
   saved: boolean;
+  /** The transport map of the initialisation (ny x nx x 2, box units), for the OT overlay. */
+  ot?: { T: Float32Array; grid: { ny: number; nx: number } } | null;
 }
 
 export interface JobState {
@@ -181,7 +187,7 @@ export class Store {
       log: [],
       live: null,
       curve: [],
-      layers: { gaussians: false, error: false },
+      layers: { gaussians: false, error: false, vector: false, ot: false },
       errorStats: null,
       monitor: false,
       regions: [],

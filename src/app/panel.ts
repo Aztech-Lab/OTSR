@@ -1,9 +1,10 @@
 // The console (left): the mode switch, numbered sections — source, preset, output, and in research mode view /
-// region / session — and the process log of the running / last job. The fit button floats over the image (main.ts).
+// region / session — and the process log of the running / last job. Every control carries an English and a
+// Traditional Chinese label. The fit button floats over the image (main.ts).
 
 import { EDGE_PX } from '../core/spec';
 import type { Actions, SampleEntry } from './actions';
-import { fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
+import { bi, fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
 import { effectiveSettings, fitMemoryBytes, fitSecondsEstimate, gaussianCount, viewMemoryBytes } from './presets';
 import type { AppState, Loss, Mode, Preset, Store, ViewMode } from './store';
 import type { Viewer } from './viewer';
@@ -11,25 +12,25 @@ import type { Viewer } from './viewer';
 type Refresh = (s: AppState) => void;
 
 const PRESET_TEXT: Record<Preset, [string, string]> = {
-  fast: ['Fast', '1/20 px · 1.5k'],
-  standard: ['Std', '1/10 px · 3k'],
-  best: ['Best', '1/7 px · 4k'],
-  custom: ['Custom', 'manual'],
+  fast: ['Fast', '快速 · 1/20 px · 1.5k'],
+  standard: ['Std', '標準 · 1/10 px · 3k'],
+  best: ['Best', '最佳 · 1/7 px · 4k'],
+  custom: ['Custom', '自訂 · manual'],
 };
 const VIEW_TEXT: [ViewMode, string, string][] = [
-  ['otsr', 'OTSR', 'enhanced'],
-  ['raw', 'Raw', 'gaussians'],
-  ['bicubic', 'Bicubic', 'source'],
-  ['bilinear', 'Bilinear', 'source'],
-  ['nearest', 'Nearest', 'source'],
+  ['otsr', 'OTSR', '增強結果'],
+  ['raw', 'Raw', '原始高斯'],
+  ['bicubic', 'Bicubic', '雙三次'],
+  ['bilinear', 'Bilinear', '雙線性'],
+  ['nearest', 'Nearest', '最近鄰'],
 ];
 const LOSS_TEXT: [Loss, string, string][] = [
-  ['l2', 'L2', 'mse'],
-  ['l1', 'L1', 'charbonnier'],
+  ['l2', 'L2', '均方誤差'],
+  ['l1', 'L1', '絕對誤差'],
 ];
 const SCALES = [1, 2, 4, 8, 16];
 const PROGRESS_CELLS = 24;
-const LOG_LINES = 6;
+const LOG_LINES = 8;
 /** Pixel counts for the scale buttons: 2048, 8192, 16.4k. */
 const px = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
 
@@ -80,7 +81,7 @@ export class Panel {
     const [rCount, vCount] = readout('Gaussians');
     const [rMem, vMem, kMem] = readout('GPU mem · est');
     const source = section('Source', '輸入',
-      h('div', { class: 'file' }, h('div', null, fileName, fileMeta), h('button', { class: 'textbtn', onClick: () => fileInput.click() }, 'Replace', h('span', { class: 'key' }, 'O')), fileInput),
+      h('div', { class: 'file' }, h('div', null, fileName, fileMeta), h('button', { class: 'textbtn', onClick: () => fileInput.click() }, bi('Replace', '替換'), h('span', { class: 'key' }, 'O')), fileInput),
       h('div', { class: 'readouts' }, rSize, rCount, rMem),
     );
     this.refreshers.push((st) => {
@@ -109,14 +110,14 @@ export class Panel {
     const presetKeys: Preset[] = research ? ['fast', 'standard', 'best', 'custom'] : ['fast', 'standard', 'best'];
     const presets = this.choices(presetKeys.map((k) => [k, PRESET_TEXT[k][0], PRESET_TEXT[k][1]] as const), (st) => st.prefs.preset, (k) => s.setPrefs({ preset: k }));
     const custom = h('div', null,
-      this.numberField('Gaussians / px', 'kPerPx', 0.005, 1, 0.01, (v) => s.setPrefs({ kPerPx: v, preset: 'custom' })),
-      this.numberField('Steps', 'steps', 10, 20000, 100, (v) => s.setPrefs({ steps: Math.round(v), preset: 'custom' })),
+      this.numberField('Gaussians / px', '每像素高斯數', 'kPerPx', 0.005, 1, 0.01, (v) => s.setPrefs({ kPerPx: v, preset: 'custom' })),
+      this.numberField('Steps', '步數', 'steps', 10, 20000, 100, (v) => s.setPrefs({ steps: Math.round(v), preset: 'custom' })),
     );
     const note = h('div', { class: 'note' });
     const preset = section('Preset', '檔位', presets, custom, note,
-      this.switchRow('Crisp edges', 'distance-field edge pass at magnification', (st) => st.prefs.edges, (v) => { s.setPrefs({ edges: v }); this.viewer.edges = v; this.viewer.requestRender(); }),
-      research ? this.rangeField('Edge width', 'edgePx', 0.4, 3, 0.1, 'px', (v) => { s.setPrefs({ edgePx: v }); this.viewer.edgePx = v; this.viewer.requestRender(); }) : null,
-      research ? h('div', { class: 'field', style: 'grid-template-columns: 1fr 150px' }, h('span', null, 'Pixel loss'),
+      this.switchRow('Crisp edges', '銳利邊緣', 'distance-field edge pass at magnification', (st) => st.prefs.edges, (v) => { s.setPrefs({ edges: v }); this.viewer.edges = v; this.viewer.requestRender(); }),
+      research ? this.rangeField('Edge width', '邊緣寬度', 'edgePx', 0.4, 3, 0.1, 'px', (v) => { s.setPrefs({ edgePx: v }); this.viewer.edgePx = v; this.viewer.requestRender(); }) : null,
+      research ? h('div', { class: 'field', style: 'grid-template-columns: 1fr 150px' }, h('span', null, 'Pixel loss', h('i', { class: 'zh' }, '像素損失')),
         this.choices(LOSS_TEXT, (st) => st.prefs.loss ?? 'l2', (k) => s.setPrefs({ loss: k }), 'small')) : null,
     );
     this.refreshers.push((st) => {
@@ -131,18 +132,18 @@ export class Panel {
     });
 
     // ---- 03 output ----------------------------------------------------------------------------------------------
-    const customScale = this.numberField('Custom scale', 'scale', 0.5, 32, 0.5, (v) => s.setPrefs({ scale: v }));
+    const customScale = this.numberField('Custom scale', '自訂倍率', 'scale', 0.5, 32, 0.5, (v) => s.setPrefs({ scale: v }));
     const scaleItems = SCALES.map((v) => [v, `×${v}`, ''] as const);
-    const scales = this.choices([...scaleItems, [0, '···', 'custom'] as const], (st) => (SCALES.includes(st.prefs.scale) ? st.prefs.scale : 0), (v) => {
+    const scales = this.choices([...scaleItems, [0, '···', '自訂'] as const], (st) => (SCALES.includes(st.prefs.scale) ? st.prefs.scale : 0), (v) => {
       if (v === 0) customScale.hidden = false;
       else { s.setPrefs({ scale: v }); customScale.hidden = true; }
     }, 'tight');
     customScale.hidden = SCALES.includes(s.state.prefs.scale);
-    const exportBtn = h('button', { class: 'btn solid big', style: 'margin-top:12px', onClick: () => void a.exportPng() }, h('span', null, 'Export PNG'), h('span', { class: 'arrow' }, '↓'));
-    const saveBtn = h('button', { class: 'textbtn', onClick: () => a.saveModel() }, 'Save model', h('span', { class: 'key' }, 'S'));
+    const exportBtn = h('button', { class: 'btn solid big', style: 'margin-top:12px', onClick: () => void a.exportPng() }, bi('Export PNG', '匯出 PNG'), h('span', { class: 'arrow' }, '↓'));
+    const saveBtn = h('button', { class: 'textbtn', onClick: () => a.saveModel() }, bi('Save model', '儲存模型'), h('span', { class: 'key' }, 'S'));
     const loadInput = h('input', { type: 'file', accept: '.otsr', hidden: true, onChange: () => { const f = loadInput.files?.[0]; if (f) void a.openModelFile(f); loadInput.value = ''; } });
     const output = section('Output', '輸出', scales, customScale, exportBtn,
-      h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, 'Load model ↗'), loadInput));
+      h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, bi('Load model', '載入模型'), h('span', { class: 'arrow' }, '↗')), loadInput));
     this.refreshers.push((st) => {
       const base = st.model ?? st.image;
       scales.querySelectorAll('button').forEach((b, i) => {
@@ -161,10 +162,12 @@ export class Panel {
         ...(['bicubic', 'bilinear', 'nearest'] as const).map((k) => h('option', { value: k, selected: s.state.prefs.compareWith === k }, k.charAt(0).toUpperCase() + k.slice(1))));
       const layerNote = h('div', { class: 'note', style: 'white-space:pre-wrap' });
       sections.push(section('View', '視圖', views,
-        this.switchRow('Split compare', 'divider between the source and the result (C)', (st) => st.prefs.compare === 'split', (v) => { s.setPrefs({ compare: v ? 'split' : 'off' }); this.viewer.compare = v; this.viewer.requestRender(); }),
-        h('label', { class: 'field' }, h('span', null, 'Compare with'), cmpWith),
-        this.switchRow('Gaussians 1σ', 'outline of every Gaussian in its own colour, from 2× zoom (G)', (st) => st.layers.gaussians, (v) => a.setLayer('gaussians', v)),
-        this.switchRow('Error map', '|model − source| per pixel, inferno scale, auto gain (D)', (st) => st.layers.error, (v) => a.setLayer('error', v)),
+        this.switchRow('Split compare', '分割對比', 'divider between the source and the result (C)', (st) => st.prefs.compare === 'split', (v) => { s.setPrefs({ compare: v ? 'split' : 'off' }); this.viewer.compare = v; this.viewer.requestRender(); }),
+        h('label', { class: 'field' }, h('span', null, 'Compare with', h('i', { class: 'zh' }, '對比對象')), cmpWith),
+        this.switchRow('Vector view', '矢量視角', 'every Gaussian in a random colour × its luma (V)', (st) => st.layers.vector, (v) => a.setLayer('vector', v)),
+        this.switchRow('OT lattice', '傳輸網格', 'the transport lattice of the initialisation (T)', (st) => st.layers.ot, (v) => a.setLayer('ot', v)),
+        this.switchRow('Gaussians 1σ', '高斯輪廓', 'outline of every Gaussian in its own colour, from 2× zoom (G)', (st) => st.layers.gaussians, (v) => a.setLayer('gaussians', v)),
+        this.switchRow('Error map', '誤差圖', '|model − source| per pixel, inferno scale, auto gain (D)', (st) => st.layers.error, (v) => a.setLayer('error', v)),
         layerNote));
       this.refreshers.push((st) => {
         views.querySelectorAll('button').forEach((b, i) => { const k = VIEW_TEXT[i][0]; b.disabled = k === 'otsr' || k === 'raw' ? !st.model : !st.sourceBuf; });
@@ -183,11 +186,11 @@ export class Panel {
       });
 
       const roiInfo = h('div', { class: 'note' });
-      const zoomRoi = h('button', { class: 'textbtn', onClick: () => { const r = this.viewer.roi.roi; if (r) this.viewer.zoomToRoi(r); } }, 'Zoom to region →');
-      const clearRoi = h('button', { class: 'textbtn', onClick: () => { this.viewer.roi.set(null); a.setTool('pan'); } }, 'Clear ×');
+      const zoomRoi = h('button', { class: 'textbtn', onClick: () => { const r = this.viewer.roi.roi; if (r) this.viewer.zoomToRoi(r); } }, bi('Zoom to region', '縮放至區域'), h('span', { class: 'arrow' }, '→'));
+      const clearRoi = h('button', { class: 'textbtn', onClick: () => { this.viewer.roi.set(null); a.setTool('pan'); } }, bi('Clear', '清除'), h('span', { class: 'arrow' }, '×'));
       sections.push(section('Region', '區域',
-        this.switchRow('Region tool', 'drag on the image to draw; arrow keys nudge (M)', (st) => st.tool === 'roi', (v) => a.setTool(v ? 'roi' : 'pan')),
-        this.switchRow('Square', 'keep the region square', () => this.viewer.roi.opts.square, (v) => { this.viewer.roi.opts.square = v; }),
+        this.switchRow('Region tool', '區域工具', 'drag on the image to draw; arrow keys nudge (M)', (st) => st.tool === 'roi', (v) => a.setTool(v ? 'roi' : 'pan')),
+        this.switchRow('Square', '正方形', 'keep the region square', () => this.viewer.roi.opts.square, (v) => { this.viewer.roi.opts.square = v; }),
         roiInfo, h('div', { class: 'links' }, zoomRoi, clearRoi)));
       this.refreshers.push((st) => {
         roiInfo.textContent = st.roi ? `x ${st.roi.x} · y ${st.roi.y} · ${st.roi.w}×${st.roi.h} px` : 'no region';
@@ -205,7 +208,7 @@ export class Panel {
       const session = section('Session', '會話', info, curve, curveLabel);
       if (this.samples.length) {
         const sel = h('select', { 'aria-label': 'Sample image' }, ...this.samples.map((e) => h('option', { value: e.file }, `${e.file} (${e.w}×${e.h})`)));
-        session.append(h('label', { class: 'field' }, h('span', null, 'Sample'), sel), h('div', { class: 'links' }, h('button', { class: 'textbtn', onClick: () => void a.loadSample(sel.value) }, 'Load sample →')));
+        session.append(h('label', { class: 'field' }, h('span', null, 'Sample', h('i', { class: 'zh' }, '樣本')), sel), h('div', { class: 'links' }, h('button', { class: 'textbtn', onClick: () => void a.loadSample(sel.value) }, bi('Load sample', '載入樣本'), h('span', { class: 'arrow' }, '→'))));
       }
       sections.push(session);
       this.refreshers.push((st) => {
@@ -235,12 +238,13 @@ export class Panel {
       const frac = busy ? Math.max(0, st.job!.fraction) : 0;
       cells.forEach((c, i) => c.classList.toggle('on', i < Math.round(frac * PROGRESS_CELLS)));
       const lines = st.log.slice(-LOG_LINES);
+      log.style.maxHeight = `${LOG_LINES * 16}px`;
       log.hidden = lines.length === 0;
       logHead.hidden = lines.length === 0;
       log.replaceChildren(...lines.map((l) => h('div', { title: l }, l)));
       if (st.lastFit && !busy) {
         const f = st.lastFit;
-        done.replaceChildren(h('span', { class: 'note', style: 'margin:0' }, `${fmtInt(f.count)} g · ${fmtInt(f.steps)} steps · ${fmtSeconds(f.seconds)}`), h('span', { class: 'tag' }, f.cancelled ? 'Stopped' : 'Complete'));
+        done.replaceChildren(h('span', { class: 'note', style: 'margin:0' }, `${fmtInt(f.count)} g · ${fmtInt(f.steps)} steps · ${fmtSeconds(f.seconds)}`), h('span', { class: 'tag' }, f.cancelled ? 'Stopped · 已停止' : 'Complete · 完成'));
         done.hidden = false;
       } else done.hidden = true;
     });
@@ -263,10 +267,10 @@ export class Panel {
     return host;
   }
 
-  private switchRow(label: string, sub: string, get: (st: AppState) => boolean, onChange: (v: boolean) => void): HTMLElement {
+  private switchRow(label: string, zh: string, sub: string, get: (st: AppState) => boolean, onChange: (v: boolean) => void): HTMLElement {
     const input = h('input', { type: 'checkbox', onChange: () => onChange(input.checked) });
     this.refreshers.push((st) => { input.checked = get(st); });
-    return h('label', { class: 'switch' }, h('span', { class: 'lab' }, label, h('small', null, sub)), input, h('span', { class: 'tg' }));
+    return h('label', { class: 'switch' }, h('span', { class: 'lab' }, label, h('i', { class: 'zh' }, zh), h('small', null, sub)), input, h('span', { class: 'tg' }));
   }
 
   private numberInput(key: 'kPerPx' | 'steps' | 'scale', min: number, max: number, step: number, onChange: (v: number) => void): HTMLInputElement {
@@ -280,14 +284,14 @@ export class Panel {
     return input;
   }
 
-  private numberField(label: string, key: 'kPerPx' | 'steps' | 'scale', min: number, max: number, step: number, onChange: (v: number) => void): HTMLElement {
-    return h('label', { class: 'field' }, h('span', null, label), this.numberInput(key, min, max, step, onChange));
+  private numberField(label: string, zh: string, key: 'kPerPx' | 'steps' | 'scale', min: number, max: number, step: number, onChange: (v: number) => void): HTMLElement {
+    return h('label', { class: 'field' }, h('span', null, label, h('i', { class: 'zh' }, zh)), this.numberInput(key, min, max, step, onChange));
   }
 
-  private rangeField(label: string, key: 'edgePx', min: number, max: number, step: number, unit: string, onChange: (v: number) => void): HTMLElement {
+  private rangeField(label: string, zh: string, key: 'edgePx', min: number, max: number, step: number, unit: string, onChange: (v: number) => void): HTMLElement {
     const input = h('input', { type: 'range', min, max, step, value: String(this.store.state.prefs[key] ?? EDGE_PX) });
     const out = h('output', null, `${Number(input.value).toFixed(1)} ${unit}`);
     input.addEventListener('input', () => { out.textContent = `${Number(input.value).toFixed(1)} ${unit}`; onChange(Number(input.value)); });
-    return h('label', { class: 'range' }, h('span', null, label), out, input);
+    return h('label', { class: 'range' }, h('span', null, label, h('i', { class: 'zh' }, zh)), out, input);
   }
 }

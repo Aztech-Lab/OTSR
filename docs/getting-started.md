@@ -42,22 +42,28 @@ The switch in the header picks the mode; the choice and every setting are rememb
    distance-field edge pass; leave it on unless you want the plain Gaussian render.
 3. **Enhance** — the copper button at the top centre (`F` or Enter). While it runs, the button becomes a live
    readout: step, PSNR, iterations per second, time left and the PSNR curve; *Stop* (or Esc) keeps what has been
-   fitted so far. Then **Export PNG** at 1×, 2×, 4×, 8×, 16× or any factor (the output size is shown under each
-   choice), or **Save model** (`.otsr`, 36 bytes per Gaussian) to re-open later with *Load model…* without a new fit.
+   fitted so far. Then **Export** at 1×, 2×, 4×, 8×, 16× or any factor (the output size is shown under each choice)
+   as PNG, JPEG, WebP or AVIF — the ▾ next to the button picks the format (AVIF only where the browser can encode it;
+   otherwise the file is saved as PNG and you are told) — or **Save model** (`.otsr`, 36 bytes per Gaussian) to
+   re-open later with *Load model…* without a new fit. Clicking the **OTSR** wordmark returns to the start screen.
 
 While the fit runs the view plays the process itself (*Fit animation* in the settings): the uniform lattice, then the
 real stages of the optimal-transport initialisation (the barycentric map after every ε-scaling stage of the Sinkhorn
-loop) as a glowing mesh that settles on the image structure; then the Gaussians at their actual positions, read back
-from the GPU every 0.6 s, growing from nothing into a random watercolour; finally a scan line from left to right
-reveals the fitted image. A **monitor** panel slides in from the right with the four regions where the Gaussians are
-changing most (measured from the parameters between two snapshots), each as a live render of the model; it closes
-when the fit ends and reopens from the tab on the right edge. The console on the left logs the real steps (density,
-Sinkhorn stages, upload, optimisation, readback, edge pass) and collapses to a tab with the arrow in its head.
+loop) as a glowing mesh that settles on the image structure; then the Gaussians themselves, rendered live by the
+engine from the parameters the optimiser is changing, growing from points, each with an independent random colour
+(the Gaussian-id view of the research code, a small display-only kernel `recolour.wgsl`); finally a scan line from
+left to right gives every Gaussian its true colour back. A **monitor** panel slides in from the right with the three regions of the image with the
+strongest gradient (chosen when the fit starts), each as a live render — in Gaussian-id colours while the fit runs,
+in true colours afterwards; it closes when the fit ends and reopens from the tab on the right edge. The console on the left logs the real steps (density, Sinkhorn stages, upload, optimisation, readback, edge
+pass); the copper bookmark on a panel's inner edge collapses it.
 
 After the fit the view shows a **split comparison**: bicubic interpolation of the original on the left of the divider,
 OTSR on the right. Drag the divider, zoom in (wheel, `+`/`−`, the toolbar) and pan (drag) to inspect; press `0` to fit
 the image to the view and `1` for actual pixels. Hold `B` to see bicubic everywhere, `N` for nearest neighbour and `R`
-for the raw Gaussians without the edge pass. The toolbar's *Compare* button (or `C`) toggles the divider. Pixel rulers
+for the raw Gaussians without the edge pass. The toolbar's *Compare* button (or `C`) toggles the divider; its *View* menu
+switches the layers: the **vector view** (`V`, every Gaussian in a random colour times its luma — the Gaussian-id
+figure of the paper), the **OT lattice** of the initialisation over the image (`T`), the **1σ outlines** (`G`) and
+the **error map** (`D`). Pixel rulers
 run along the top and left edge of the image and the status strip shows the source pixel under the cursor. The canvas
 is clipped to the image, so the slowly moving stage shows around it when zoomed out. The *GPU mem* readout is an
 estimate from the engine's allocations before the fit and the allocated figure afterwards. Errors open a dialog; the
@@ -69,7 +75,8 @@ status strip keeps the last message. The light / dark button sits at the top rig
   of the edge pass in output pixels, 1.4 by default: smaller is harder, larger softer); the pixel loss — *L2* (mean
   squared error, the paper setting) or *L1* (Charbonnier, ε = 10⁻³; PSNR is always reported against the source).
 - *View*: OTSR, Gaussians only (no edge pass), and the classic resamplers of the source — bicubic, bilinear, nearest —
-  plus the split comparison against any of them. Two analysis layers: **Gaussians 1σ** (`G`) draws the 1-sigma outline
+  plus the split comparison against any of them, and the four layers of the toolbar's *View* menu: **Vector view** (`V`),
+  **OT lattice** (`T`), **Gaussians 1σ** (`G`) draws the 1-sigma outline
   of every Gaussian in view in its own colour from 2× zoom on; **Error map** (`D`) renders the model at 1× and shows
   |model − source| per pixel on an inferno scale whose gain follows the 99.5th percentile (the mean and maximum error
   and the white point are listed under the switches).

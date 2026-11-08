@@ -10,7 +10,7 @@
 </head>
 <body data-mode="simple" class="empty">
   <div id="stage">
-    <div class="bg" aria-hidden="true"><i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i><i class="hex h1"></i><i class="hex h2"></i><i class="hex h3"></i><i class="sweep"></i></div>
+    <div class="bg" aria-hidden="true"><canvas id="bgfield"></canvas><i class="frost"></i><i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i></div>
     <canvas id="view"></canvas>
     <canvas id="overlay" aria-hidden="true"></canvas>
     <div class="vignette" aria-hidden="true"></div>
@@ -24,7 +24,7 @@
 
   <div id="command" class="float command">
     <div id="cmd-idle">
-      <button id="cmd-fit" class="btn copper big" title="Fit the Gaussians to the image (F)"><span id="cmd-fit-label">Enhance</span><span class="arrow">▶</span></button>
+      <button id="cmd-fit" class="btn copper big" title="Fit the Gaussians to the image (F)"><span id="cmd-fit-label" class="bi"><b>Enhance</b><small>增強</small></span><span class="arrow">▶</span></button>
       <div class="micro" id="cmd-sub"></div>
     </div>
     <div id="cmd-live" class="live" hidden>
@@ -32,15 +32,15 @@
       <div class="nums" id="live-nums"><b id="live-psnr">—</b><span>dB PSNR</span><em id="live-rate"></em><em id="live-left"></em></div>
       <svg id="live-curve" class="spark" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true"><polyline points=""/></svg>
       <div class="progress" id="live-progress"></div>
-      <div class="foot"><span class="micro" id="live-text"></span><button id="cmd-stop" class="textbtn" title="Stop (Esc)">Stop ×</button></div>
+      <div class="foot"><span class="micro" id="live-text"></span><button id="cmd-stop" class="textbtn" title="Stop (Esc)"><span class="bi"><b>Stop</b><small>停止</small></span><span class="arrow">×</span></button></div>
     </div>
   </div>
 
   <nav class="float sysnav" aria-label="System">
-    <button id="nav-open" class="navbtn" title="Open an image (O)"><span class="key">O</span><span class="label">Open</span></button>
+    <button id="nav-open" class="navbtn" title="Open an image (O)"><span class="key">O</span><span class="bi"><b>Open</b><small>開啟</small></span></button>
     <button id="theme-btn" class="themebtn" title="Switch between the light and the dark theme" aria-pressed="false"><span class="ico" id="theme-ico">☾</span><span class="two"><b id="theme-en">Dark mode</b><small id="theme-zh">深色模式</small></span></button>
-    <button id="settings-btn" class="navbtn" title="Settings"><span class="label">Settings</span><span class="key">⚙</span></button>
-    <button id="help-btn" class="navbtn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><span class="key">?</span></button>
+    <button id="settings-btn" class="navbtn" title="Settings"><span class="bi"><b>Settings</b><small>設定</small></span><span class="key">⚙</span></button>
+    <button id="help-btn" class="navbtn" title="Keyboard shortcuts (?)"><span class="key">?</span><span class="bi"><b>Keys</b><small>快捷鍵</small></span></button>
   </nav>
 
   <section id="empty" class="float instrument" aria-label="Open an image">
@@ -64,8 +64,8 @@
       <div class="micro">■ Input required</div>
       <h2>Drop image</h2>
       <div class="zh">拖入 · 貼上 · 選擇</div>
-      <div class="open"><button id="empty-open" class="btn solid"><span>Open image</span><span class="arrow">→</span></button></div>
-      <div id="empty-samples" class="links" hidden></div>
+      <div class="open pair"><button id="empty-sample" class="btn pale" hidden><span class="bi"><b>Load sample</b><small>載入樣本</small></span><span class="arrow">↓</span></button><button id="empty-open" class="btn copper"><span class="bi"><b>Open image</b><small>開啟圖片</small></span><span class="arrow">→</span></button></div>
+      <div id="empty-samples" class="samplesel" hidden></div>
     </div>
     <span class="corner-note tl">// Any size<br>// Any aspect ratio</span>
     <span class="corner-note tr">On-device<br>Nothing uploaded</span>
@@ -75,15 +75,17 @@
   <div id="boot" class="float bootlog" aria-hidden="true"></div>
 
   <aside id="inspector" class="float console" aria-label="Controls">
-    <div class="console-head"><span id="console-title">Control // 01</span><span class="hatch"></span><span id="console-state"><span class="sq ok"></span> idle</span><button id="console-collapse" class="headbtn" title="Collapse the console · 收起">‹</button></div>
+    <div class="console-head"><span id="console-title">Control // 01</span><span class="hatch"></span><span id="console-state"><span class="sq ok"></span> idle</span></div>
     <div id="panel" class="console-body"></div>
   </aside>
+  <button id="console-bookmark" class="float bookmark left" title="Collapse the console · 收起"><i>‹</i></button>
   <button id="left-tab" class="float paneltab left" title="Open the console · 展開控制台"><i>›</i><span>Control</span><small>控制台</small></button>
 
   <aside id="monitor" class="float monitor" aria-label="Monitor">
-    <div class="console-head"><span>Monitor // Active regions</span><span class="hatch"></span><span class="zh">活躍區域</span><button id="monitor-collapse" class="headbtn" title="Hide the monitor · 收起">›</button></div>
+    <div class="console-head"><span>Active regions</span><span class="hatch"></span><span class="zh">活躍區域</span></div>
     <div id="monitor-body" class="console-body"></div>
   </aside>
+  <button id="monitor-bookmark" class="float bookmark right" title="Hide the monitor · 收起"><i>›</i></button>
   <button id="right-tab" class="float paneltab right" title="Open the monitor · 展開監視器"><i>‹</i><span>Monitor</span><small>監視器</small></button>
 
   <div class="float result-hud" id="readout">
@@ -98,10 +100,14 @@
     <button id="tb-zoom-in" class="arrow" title="Zoom in (+)">+</button>
     <div class="val"><small>Zoom</small><span id="zoom-readout">100%</span></div>
     <div class="tools">
-      <button id="tb-fit" class="textbtn" title="Fit to view"><span class="key">0</span>Fit</button>
-      <button id="tb-100" class="textbtn" title="Actual pixels"><span class="key">1</span>1:1</button>
-      <button id="tb-split" class="textbtn" title="Before / after"><span class="key">C</span>Compare</button>
-      <button id="tb-roi" class="textbtn" title="Region tool" hidden><span class="key">M</span>Region</button>
+      <button id="tb-fit" class="textbtn" title="Fit to view"><span class="key">0</span><span class="bi"><b>Fit</b><small>適應</small></span></button>
+      <button id="tb-100" class="textbtn" title="Actual pixels"><span class="key">1</span><span class="bi"><b>1:1</b><small>原始像素</small></span></button>
+      <button id="tb-split" class="textbtn" title="Before / after"><span class="key">C</span><span class="bi"><b>Compare</b><small>對比</small></span></button>
+      <button id="tb-roi" class="textbtn" title="Region tool" hidden><span class="key">M</span><span class="bi"><b>Region</b><small>區域</small></span></button>
+      <div class="viewwrap">
+        <button id="tb-view" class="textbtn" title="View layers (V / T / G / D)"><span class="key">V</span><span class="bi"><b>View</b><small>檢視</small></span><span class="arrow">▴</span></button>
+        <div id="viewmenu" class="viewmenu" hidden></div>
+      </div>
     </div>
   </div>
 
@@ -110,33 +116,33 @@
     <span class="fill" id="status"></span>
     <span class="seg-count" id="seg-count" aria-hidden="true"></span>
     <span class="cursor" id="cursor">X — Y —</span>
-    <span class="right"><span id="adapter">GPU —</span> &nbsp;·&nbsp; <span id="clock">--:--:--</span> &nbsp;·&nbsp; <button id="reload-btn" class="textbtn">Reinit ↗</button></span>
+    <span class="right"><span id="adapter">GPU —</span> &nbsp;·&nbsp; <span id="clock">--:--:--</span> &nbsp;·&nbsp; <button id="reload-btn" class="textbtn"><span class="bi"><b>Reinit</b><small>重新初始化</small></span><span class="arrow">↗</span></button></span>
   </footer>
 
-  <div id="drop-hint" class="drop-hint" hidden><div>Release to load</div></div>
+  <div id="drop-hint" class="drop-hint" hidden><div>Release to load · 放開以載入</div></div>
   <div id="nogpu" class="nogpu" hidden>
     <div class="card">
       <h2>WebGPU unavailable</h2>
       <p id="nogpu-msg"></p>
       <p>OTSR needs WebGPU: Chrome 113+, Edge 113+ or Safari 26+ on a machine with a GPU, served over http(s). On computers with two GPUs make sure the browser uses the dedicated one — see <a href="docs/troubleshooting.md">troubleshooting</a>.</p>
-      <button class="btn solid" onclick="location.reload()"><span>Reload</span><span class="arrow">↻</span></button>
+      <button class="btn solid" onclick="location.reload()"><span class="bi"><b>Reload</b><small>重新載入</small></span><span class="arrow">↻</span></button>
     </div>
   </div>
 
   <dialog id="settings" class="modal">
-    <div class="console-head"><span>System // Preferences</span><span class="hatch"></span><button id="settings-close" class="textbtn head">Close ×</button></div>
+    <div class="console-head"><span>System // Preferences</span><span class="hatch"></span><button id="settings-close" class="textbtn head"><span class="bi"><b>Close</b><small>關閉</small></span><span class="arrow">×</span></button></div>
     <div class="body">
       <h2>Settings<small>偏好設定</small></h2>
       <div class="setting"><div class="lab">Theme<small>明暗主題</small></div><div class="seg" id="theme-seg"></div></div>
       <div class="setting"><div class="lab">Mode<small>簡單模式只保留核心功能；科研模式開放全部參數與分析工具</small></div><div class="seg" id="mode-seg"></div></div>
-      <div class="setting"><div class="lab">Fit animation<small>擬合過程的傳輸網格、水彩與掃描線動畫；關閉後直接顯示即時渲染</small></div><label class="switch" style="margin:0"><input type="checkbox" id="anim-toggle"><span class="tg"></span></label></div>
-      <div class="setting"><div class="lab">Motion<small>圓環旋轉、背景漂移、掃描線等裝飾動效</small></div><label class="switch" style="margin:0"><input type="checkbox" id="motion-toggle"><span class="tg"></span></label></div>
-      <div class="modal-foot"><span>OTSR 0.1.0 · MIT · runs on your GPU</span><a href="docs/index.md" target="_blank">Documentation ↗</a></div>
+      <div class="setting"><div class="lab">Fit animation<small>擬合動畫：傳輸網格、矢量視角、掃描線；關閉後直接顯示即時渲染</small></div><label class="switch" style="margin:0"><input type="checkbox" id="anim-toggle"><span class="tg"></span></label></div>
+      <div class="setting"><div class="lab">Motion<small>動效：圓環旋轉、背景、掃描線等裝飾動畫</small></div><label class="switch" style="margin:0"><input type="checkbox" id="motion-toggle"><span class="tg"></span></label></div>
+      <div class="modal-foot"><span>OTSR 0.1.0 · MIT · runs on your GPU</span><a href="docs/index.md" target="_blank">Documentation · 文件 ↗</a></div>
     </div>
   </dialog>
 
   <dialog id="help" class="modal">
-    <div class="console-head"><span>System // Keyboard</span><span class="hatch"></span><button id="help-close" class="textbtn head">Close ×</button></div>
+    <div class="console-head"><span>System // Keyboard</span><span class="hatch"></span><button id="help-close" class="textbtn head"><span class="bi"><b>Close</b><small>關閉</small></span><span class="arrow">×</span></button></div>
     <div class="body">
       <h2>Shortcuts<small>快捷鍵</small></h2>
       <table><tbody id="help-table"></tbody></table>
@@ -149,7 +155,7 @@
     <div class="body">
       <h2>Something went wrong<small>出錯了</small></h2>
       <div id="alert-msg" class="alert-msg"></div>
-      <div class="modal-foot"><span>The status strip keeps the last message</span><button id="alert-close" class="btn solid"><span>OK</span><span class="arrow">↵</span></button></div>
+      <div class="modal-foot"><span>The status strip keeps the last message</span><button id="alert-close" class="btn solid"><span class="bi"><b>OK</b><small>確定</small></span><span class="arrow">↵</span></button></div>
     </div>
   </dialog>
   <script type="module" src="/src/app/main.ts"></script>

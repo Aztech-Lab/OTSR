@@ -1,6 +1,6 @@
 # Tutorial: how the research code became a WebGPU engine
 
-This is the working record of the port, written for people (and agents) who have to do the same thing: take a
+This is the working record of the port, written for people who have to do the same thing: take a
 PyTorch/CUDA research pipeline and turn it into a verified, fast, dependency-free GPU implementation. It is
 organised as the steps actually taken, with the derivations, the design decisions and the mistakes.
 

@@ -17,13 +17,19 @@ export interface ViewerModel {
   params: GPUBuffer;
   /** CPU copy of the parameters when available (the Gaussian outline layer reads it). */
   cpu?: Float32Array | null;
+  /** The transport map of the initialisation, for the OT lattice layer. */
+  ot?: { T: Float32Array; grid: { ny: number; nx: number } } | null;
 }
 
 export interface ViewerLayers {
-  /** 1-sigma outlines of the Gaussians in their own colour (research). */
+  /** 1-sigma outlines of the Gaussians in their own colour. */
   gaussians: boolean;
-  /** The |error| map of the fit over the image (research). */
+  /** The |error| map of the fit over the image. */
   error: boolean;
+  /** Gaussian-id colours (handled by the recolour hook, not the overlay). */
+  vector: boolean;
+  /** The optimal-transport lattice of the initialisation. */
+  ot: boolean;
 }
 
 export interface ViewerSource {
@@ -80,7 +86,10 @@ export class Viewer {
   painter: ((g: CanvasRenderingContext2D, t: RoiTransform, dpr: number) => void) | null = null;
   /** Labelled boxes in source pixels (the monitor's active regions). */
   markers: { x: number; y: number; w: number; h: number; label: string; score: number }[] = [];
-  layers: ViewerLayers = { gaussians: false, error: false };
+  /** Extra compute work encoded before every model render (the fit animation refreshes its recoloured copy). */
+  beforeRender: ((enc: GPUCommandEncoder) => void) | null = null;
+  private paramsOverride: GPUBuffer | null = null;
+  layers: ViewerLayers = { gaussians: false, error: false, vector: false, ot: false };
   /** Outline layer statistics of the last overlay draw: Gaussians inside the view and how many were drawn. */
   outlineInfo = { visible: 0, drawn: 0, tooFar: false };
   /** Output (device) pixels per source pixel. */
@@ -114,7 +123,11 @@ export class Viewer {
   private hoverOn = false;
   private readonly dpr = window.devicePixelRatio || 1;
 
-  constructor(readonly canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, readonly ctx: GpuContext, readonly pipes: Pipelines) {
+  /** Receives the pointer events (the whole stage, so panning and zooming work anywhere, not only over the image). */
+  readonly input: HTMLElement;
+
+  constructor(readonly canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, readonly ctx: GpuContext, readonly pipes: Pipelines, input?: HTMLElement) {
+    this.input = input ?? canvas;
     this.device = ctx.device;
     this.overlay = overlay;
     const cc = canvas.getContext('webgpu');
@@ -157,15 +170,23 @@ export class Viewer {
   setTool(tool: Tool): void {
     if (tool === this.tool) return;
     this.tool = tool;
-    this.canvas.style.cursor = tool === 'roi' ? 'crosshair' : 'grab';
+    this.input.style.cursor = tool === 'roi' ? 'crosshair' : 'grab';
     this.events.onToolChange?.(tool);
     this.drawOverlay();
   }
 
   setModel(model: ViewerModel | null): void {
     this.model = model;
+    this.paramsOverride = null;
     this.rebuild();
     this.changed();
+  }
+
+  /** Draws the model from another parameter buffer of the same count (null: the model's own), e.g. a recoloured copy. */
+  overrideParams(buf: GPUBuffer | null): void {
+    this.paramsOverride = buf;
+    if (this.raster && this.model) this.raster.setParams(buf ?? this.model.params);
+    this.requestRender();
   }
 
   setSource(source: ViewerSource | null): void {
@@ -336,6 +357,7 @@ export class Viewer {
     this.bufB = createBuffer(this.device, bytes, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC, 'viewer.B');
     if (this.model) {
       this.raster = new Rasterizer(this.ctx, this.pipes, this.model.params, this.model.N, this.width, this.height, Math.max(4096, this.model.N));
+      if (this.paramsOverride) this.raster.setParams(this.paramsOverride);
       this.edge = new EdgePass(this.ctx, this.pipes, this.width, this.height);
     }
   }
@@ -371,6 +393,7 @@ export class Viewer {
     if (modelMode && this.model && this.raster) {
       // below native resolution, prefilter with the pixel footprint (std 1/2 output px of the missing detail)
       view.aa = this.zoom < 1 ? 0.5 * Math.sqrt(1 - this.zoom * this.zoom) : 0;
+      this.beforeRender?.(enc);
       this.raster.setView(view);
       this.raster.encodeBuild(enc);
       this.raster.encodeForward(enc);
@@ -424,6 +447,7 @@ export class Viewer {
       g.restore();
     }
     if (this.rulers) this.drawRulers(g, t, dpr);
+    if (this.layers.ot) this.drawOtMesh(g, t, dpr);
     if (this.layers.gaussians) this.drawOutlines(g, t, dpr);
     if (this.splitVisible) {
       const x = Math.round(this.splitFrac * this.width);
@@ -539,6 +563,38 @@ export class Viewer {
     g.restore();
   }
 
+  /** The transport lattice of the initialisation: the cell centres of the OT grid after the map, as a mesh. */
+  private drawOtMesh(g: CanvasRenderingContext2D, t: RoiTransform, dpr: number): void {
+    const ot = this.model?.ot;
+    if (!ot) return;
+    const { ny, nx } = ot.grid;
+    const T = ot.T;
+    const step = Math.max(1, Math.ceil(Math.max(nx, ny) / 128));
+    const z = this.zoom * Math.max(t.W, t.H);
+    const ox = this.offsetX, oy = this.offsetY;
+    const path = new Path2D();
+    for (let i = 0; i < ny; i += step) {
+      for (let j = 0; j < nx; j += step) {
+        const k = i * nx + j;
+        const x = ox + T[2 * k] * z, y = oy + T[2 * k + 1] * z;
+        if (j + step < nx) { const k2 = k + step; path.moveTo(x, y); path.lineTo(ox + T[2 * k2] * z, oy + T[2 * k2 + 1] * z); }
+        if (i + step < ny) { const k2 = k + step * nx; path.moveTo(x, y); path.lineTo(ox + T[2 * k2] * z, oy + T[2 * k2 + 1] * z); }
+      }
+    }
+    g.save();
+    g.strokeStyle = cssVar('--copper', '#b8793c');
+    g.lineWidth = 1 * dpr;
+    g.globalAlpha = 0.45;
+    g.stroke(path);
+    g.fillStyle = cssVar('--copper-2', '#d9a25f');
+    g.globalAlpha = 0.8;
+    for (let i = 0; i < ny; i += step) for (let j = 0; j < nx; j += step) {
+      const k = i * nx + j;
+      g.fillRect(ox + T[2 * k] * z - 1 * dpr, oy + T[2 * k + 1] * z - 1 * dpr, 2 * dpr, 2 * dpr);
+    }
+    g.restore();
+  }
+
   /** 1-sigma outlines of the Gaussians inside the view, each in its own colour. */
   private drawOutlines(g: CanvasRenderingContext2D, t: RoiTransform, dpr: number): void {
     const cpu = this.model?.cpu;
@@ -605,7 +661,7 @@ export class Viewer {
   }
 
   private bindPointer(): void {
-    const c = this.canvas;
+    const c = this.input;
     c.style.cursor = 'grab';
     c.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;

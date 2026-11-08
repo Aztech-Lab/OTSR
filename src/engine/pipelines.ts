@@ -12,6 +12,7 @@ import loss from './shaders/loss.wgsl?raw';
 import sinkhorn from './shaders/sinkhorn.wgsl?raw';
 import edges from './shaders/edges.wgsl?raw';
 import resample from './shaders/resample.wgsl?raw';
+import recolour from './shaders/recolour.wgsl?raw';
 
 export interface Pipelines {
   resample: GPUComputePipeline;
@@ -29,9 +30,11 @@ export interface Pipelines {
   reduceGrad: GPUComputePipeline;
   adam: GPUComputePipeline;
   loss: GPUComputePipeline;
+  /** Display-only: a recoloured copy of a parameter set (the fit animation). */
+  recolour: GPUComputePipeline;
 }
 
-export const SHADER_SOURCES = { common, preprocess, scan, fill, forward, backward, reduceGrad, adam, loss, sinkhorn, edges, resample };
+export const SHADER_SOURCES = { common, preprocess, scan, fill, forward, backward, reduceGrad, adam, loss, sinkhorn, edges, resample, recolour };
 
 async function compile(device: GPUDevice, name: string, source: string, entryPoint: string): Promise<GPUComputePipeline> {
   const module = device.createShaderModule({ label: name, code: `${common}\n${source}` });
@@ -45,7 +48,7 @@ async function compile(device: GPUDevice, name: string, source: string, entryPoi
 }
 
 export async function createPipelines(device: GPUDevice): Promise<Pipelines> {
-  const [p, sb, ao, fi, fw, bw, rg, ad, lo, lx, ly, eh, ev, ef, rs] = await Promise.all([
+  const [p, sb, ao, fi, fw, bw, rg, ad, lo, lx, ly, eh, ev, ef, rs, rc] = await Promise.all([
     compile(device, 'preprocess', preprocess, 'preprocess'),
     compile(device, 'scan', scan, 'scan_blocks'),
     compile(device, 'scan', scan, 'add_offsets'),
@@ -61,9 +64,10 @@ export async function createPipelines(device: GPUDevice): Promise<Pipelines> {
     compile(device, 'edges', edges, 'edge_v'),
     compile(device, 'edges', edges, 'edge_final'),
     compile(device, 'resample', resample, 'resample'),
+    compile(device, 'recolour', recolour, 'recolour'),
   ]);
   return {
     preprocess: p, scanBlocks: sb, addOffsets: ao, fill: fi, forward: fw, backward: bw, reduceGrad: rg, adam: ad, loss: lo,
-    lseX: lx, lseY: ly, edgeH: eh, edgeV: ev, edgeFinal: ef, resample: rs,
+    lseX: lx, lseY: ly, edgeH: eh, edgeV: ev, edgeFinal: ef, resample: rs, recolour: rc,
   };
 }

@@ -1,25 +1,28 @@
-// The fit animation, drawn on the 2-D overlay while the WebGPU render waits behind a curtain:
+// The fit animation:
 //   1. the uniform lattice, then the real optimal-transport stages (the barycentric map after every eps-scaling
-//      stage of the Sinkhorn loop) as a glowing, flickering mesh that settles on the image structure;
-//   2. the Gaussians at their actual positions (read back from the GPU while the optimiser runs) growing from
-//      nothing, grey at first, into random watercolour, while the mesh fades out;
-//   3. a scan line from left to right that reveals the fitted image in its true colours.
-// Everything here is cosmetic: positions and shapes come from the engine, the colours of phase 2 are random.
+//      stage of the Sinkhorn loop) as a glowing, flickering mesh on the overlay, while the WebGPU render waits
+//      behind a curtain;
+//   2. the Gaussians themselves, rendered live by the engine from the parameters the optimiser is changing: a
+//      display-only kernel copies them with each colour replaced by a random pastel colour times the Gaussian's
+//      luma (grey at first, the colour comes in over a second) and the sizes growing from points, while the mesh
+//      fades out;
+//   3. a scan line from left to right that gives every Gaussian its true colour back.
+// Positions, shapes and the pace are the real process; only the colours of phase 2 are random.
 
-import { OFFSET } from '../core/spec';
+import { bindGroup, grid1d, runPass, type GpuContext, type Pipelines } from '../engine';
 import type { RoiTransform } from './roi';
+import type { AppModel } from './store';
 import type { Viewer } from './viewer';
 
-const STAGE_MS = 120; // playback of one OT stage
-const HOLD_MS = 260; // pause on the final lattice before the paint phase
-const PAINT_MIN_MS = 1500; // the watercolour is shown at least this long
+const STAGE_MS = 70; // playback of one OT stage (the stages arrive together after the single Sinkhorn submit)
+const HOLD_MS = 160; // pause on the final lattice before the Gaussians appear
+const PAINT_MIN_MS = 1800; // the recoloured Gaussians are shown at least this long
 const MESH_FADE_MS = 900;
-const WARM_MS = 450; // the GPU render runs under the opaque overlay before the reveal (tile lists settle)
 const REVEAL_MS = 1300;
-const MAX_BLOBS = 7000;
-const REPAINT_MIN_MS = 500; // the watercolour cache is rebuilt at most this often
+const RENDER_INTERVAL_MS = 40; // live render cadence in phase 2 (the optimiser keeps running meanwhile)
 const MAX_NODES = 110; // mesh nodes per axis (subsampled)
 const FLICKER_MS = 90;
+const FX_BYTES = 32;
 
 interface Grid { ny: number; nx: number }
 
@@ -42,7 +45,7 @@ function ease(u: number): number {
 }
 
 export class FitShow {
-  private phase: 'off' | 'lattice' | 'paint' | 'warm' | 'reveal' = 'off';
+  private phase: 'off' | 'lattice' | 'paint' | 'reveal' = 'off';
   private W = 0;
   private H = 0;
   private L = 1;
@@ -55,26 +58,23 @@ export class FitShow {
   private finishRequested = false;
   private paintStart = 0;
   private revealStart = 0;
+  private lastRender = 0;
   private resolveFinish: (() => void) | null = null;
-  private snap: Float32Array | null = null;
-  private snapVersion = 0;
-  private painted = { version: -1, key: '', ramp: -1, at: 0 };
-  private off: HTMLCanvasElement | null = null;
-  private offG: CanvasRenderingContext2D | null = null;
+  private model: AppModel | null = null;
+  private display: GPUBuffer | null = null;
+  private uni: GPUBuffer | null = null;
+  private bg: GPUBindGroup | null = null;
+  private seed = 0;
   private raf = 0;
   private colour = '#b8793c';
   private colour2 = '#d9a25f';
   private paper = '#ebebe8';
   private dark = false;
 
-  constructor(private readonly viewer: Viewer) {}
+  constructor(private readonly viewer: Viewer, private readonly ctx: GpuContext, private readonly pipes: Pipelines) {}
 
   get active(): boolean {
     return this.phase !== 'off';
-  }
-
-  get hasSnapshot(): boolean {
-    return this.snap !== null;
   }
 
   get phaseName(): string {
@@ -91,12 +91,11 @@ export class FitShow {
     this.grid = { ny: 0, nx: 0 };
     this.latticeDone = false;
     this.finishRequested = false;
-    this.snap = null;
-    this.snapVersion = 0;
-    this.painted = { version: -1, key: '', ramp: -1, at: 0 };
+    this.holdStart = 0;
+    this.seed = (Math.random() * 1e9) >>> 0;
     this.colour = cssVar('--copper', '#b8793c');
-    this.paper = cssVar('--bg', '#ebebe8');
     this.colour2 = cssVar('--copper-2', '#d9a25f');
+    this.paper = cssVar('--bg', '#ebebe8');
     this.dark = getComputedStyle(document.documentElement).colorScheme === 'dark';
     this.phase = 'lattice';
     this.playStart = performance.now();
@@ -105,6 +104,39 @@ export class FitShow {
     this.viewer.requestRender();
     document.body.classList.add('fitshow');
     this.loop();
+  }
+
+  /** The model under optimisation: from now on the viewer draws its recoloured copy (refreshed before every render). */
+  attachModel(model: AppModel): void {
+    if (this.phase === 'off') return;
+    this.releaseModel();
+    const d = this.ctx.device;
+    this.model = model;
+    this.display = d.createBuffer({ label: 'fitshow.display', size: model.N * 36, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+    this.uni = d.createBuffer({ label: 'fitshow.fx', size: FX_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.bg = bindGroup(d, this.pipes.recolour, { 0: this.uni, 1: model.params, 2: this.display }, 'recolour');
+    this.viewer.beforeRender = (enc) => this.encodeRecolour(enc);
+    this.viewer.overrideParams(this.display);
+    // a first copy right away, so other renders of the copy (the monitor's crops) never see an empty buffer
+    const enc = d.createCommandEncoder({ label: 'fitshow.init' });
+    this.encodeRecolour(enc);
+    d.queue.submit([enc.finish()]);
+  }
+
+  /** The recoloured copy of the parameters (valid while the show runs with a model). */
+  get displayBuffer(): GPUBuffer | null {
+    return this.display;
+  }
+
+  private releaseModel(): void {
+    this.viewer.beforeRender = null;
+    if (this.model && this.viewer.hasModel) this.viewer.overrideParams(null);
+    this.display?.destroy();
+    this.uni?.destroy();
+    this.display = null;
+    this.uni = null;
+    this.bg = null;
+    this.model = null;
   }
 
   /** The uniform lattice before any transport (cell centres of the OT grid). */
@@ -147,25 +179,19 @@ export class FitShow {
     this.latticeDone = true;
   }
 
-  /** The current parameters (9 floats per Gaussian) read back from the GPU. */
-  snapshot(params: Float32Array): void {
-    if (this.phase === 'off') return;
-    this.snap = params;
-    this.snapVersion++;
-  }
-
-  /** Lets the lattice and paint phases finish, plays the reveal, then returns the view to normal. */
+  /** Lets the lattice and the live phase finish, plays the reveal, then returns the view to normal. */
   finish(): Promise<void> {
     if (this.phase === 'off') return Promise.resolve();
     this.finishRequested = true;
     return new Promise((resolve) => { this.resolveFinish = resolve; });
   }
 
-  /** Stops immediately (cancelled or failed fit). */
+  /** Stops immediately (cancelled or failed fit) and gives the viewer its real parameters back. */
   cancel(): void {
     if (this.phase === 'off') return;
     this.phase = 'off';
     cancelAnimationFrame(this.raf);
+    this.releaseModel();
     this.viewer.curtain = false;
     this.viewer.painter = null;
     this.viewer.requestRender();
@@ -175,14 +201,46 @@ export class FitShow {
     r?.();
   }
 
+  // ---- the recoloured copy ------------------------------------------------------------------------------------
+
+  /** Refreshes the recoloured copy from the live parameters (encoded before the render that uses it). */
+  encodeRecolour(enc: GPUCommandEncoder): void {
+    if (!this.model || !this.uni || !this.bg) return;
+    const now = performance.now();
+    let amount = 0, sizeLog = 0, scanU = 0;
+    if (this.phase === 'paint') {
+      const age = now - this.paintStart;
+      amount = ease((age - 350) / 1500);
+      sizeLog = Math.log(0.12 + 0.88 * ease(age / 900));
+    } else if (this.phase === 'reveal') {
+      amount = 1;
+      scanU = ease((now - this.revealStart) / REVEAL_MS) * (this.W / this.L);
+    } else {
+      sizeLog = Math.log(0.12);
+    }
+    const ab = new ArrayBuffer(FX_BYTES);
+    const u = new Uint32Array(ab);
+    const f = new Float32Array(ab);
+    u[0] = this.model.N;
+    u[1] = this.seed;
+    f[2] = amount;
+    f[3] = sizeLog;
+    f[4] = scanU;
+    this.ctx.device.queue.writeBuffer(this.uni, 0, ab);
+    runPass(enc, this.pipes.recolour, this.bg, grid1d(this.model.N), 'recolour');
+  }
+
   // ---- timeline ----------------------------------------------------------------------------------------------
 
   private loop(): void {
     this.raf = requestAnimationFrame(() => {
       if (!this.active) return;
-      this.advance(performance.now());
+      const now = performance.now();
+      this.advance(now);
       if (this.active) {
-        this.viewer.refreshOverlay();
+        if (this.phase === 'lattice') this.viewer.refreshOverlay();
+        else if (now - this.lastRender >= RENDER_INTERVAL_MS) { this.lastRender = now; this.viewer.requestRender(); }
+        else this.viewer.refreshOverlay();
         this.loop();
       }
     });
@@ -198,58 +256,44 @@ export class FitShow {
       const last = this.stages.length - 1;
       const atEnd = this.latticeDone && (last < 1 || this.latticeIndex(now) >= last);
       if (atEnd && !this.holdStart) this.holdStart = now;
-      // the paint phase needs a snapshot; a model loaded without OT has no stages at all
-      if ((atEnd && now - this.holdStart >= HOLD_MS && this.snap) || (this.latticeDone && !this.stages.length && this.snap)) {
+      if (atEnd && now - this.holdStart >= HOLD_MS && this.display) {
+        // the live render takes over: curtain up, the recoloured copy is drawn from here on
         this.phase = 'paint';
         this.paintStart = now;
-      } else if (this.finishRequested && !this.snap) {
-        // nothing to paint (cancelled before the first snapshot): straight to the end
-        this.cancel();
+        this.viewer.curtain = false;
+        this.viewer.requestRender();
+      } else if (this.finishRequested && !this.display) {
+        this.cancel(); // nothing to show (cancelled before the model existed)
       }
     } else if (this.phase === 'paint') {
       if (this.finishRequested && now - this.paintStart >= PAINT_MIN_MS) {
-        // the overlay stays opaque while the real render warms up underneath
-        this.phase = 'warm';
-        this.revealStart = now + WARM_MS;
-        this.viewer.curtain = false;
-        this.viewer.requestRender();
+        this.phase = 'reveal';
+        this.revealStart = now;
       }
-    } else if (this.phase === 'warm') {
-      this.viewer.requestRender();
-      if (now >= this.revealStart) this.phase = 'reveal';
     } else if (this.phase === 'reveal') {
-      if (now - this.revealStart >= REVEAL_MS) this.cancel();
+      if (now - this.revealStart >= REVEAL_MS + 60) this.cancel();
     }
   }
 
-  // ---- drawing -------------------------------------------------------------------------------------------------
+  // ---- overlay ------------------------------------------------------------------------------------------------
 
-  /** The blank "paper" over the image rectangle (the GPU render stays hidden), optionally only right of `clipX`. */
-  private drawPaper(g: CanvasRenderingContext2D, t: RoiTransform, clipX: number | null): void {
-    const x0 = t.offsetX, y0 = t.offsetY, w = this.W * t.zoom, hh = this.H * t.zoom;
-    const left = clipX === null ? x0 : Math.max(x0, clipX);
-    if (left >= x0 + w) return;
+  /** The blank "paper" over the image rectangle while the GPU render is hidden. */
+  private drawPaper(g: CanvasRenderingContext2D, t: RoiTransform): void {
     g.fillStyle = this.paper;
-    g.fillRect(left, y0, x0 + w - left, hh);
+    g.fillRect(t.offsetX, t.offsetY, this.W * t.zoom, this.H * t.zoom);
   }
 
   private paint(g: CanvasRenderingContext2D, t: RoiTransform, dpr: number): void {
     const now = performance.now();
     if (this.phase === 'lattice') {
-      this.drawPaper(g, t, null);
+      this.drawPaper(g, t);
       this.drawLattice(g, t, dpr, now, 1);
-    } else if (this.phase === 'paint' || this.phase === 'warm') {
-      const age = now - this.paintStart;
-      const meshAlpha = 1 - ease(age / MESH_FADE_MS);
-      this.drawPaper(g, t, null);
-      this.drawWatercolour(g, t, age, null);
+    } else if (this.phase === 'paint') {
+      const meshAlpha = 1 - ease((now - this.paintStart) / MESH_FADE_MS);
       if (meshAlpha > 0.01) this.drawLattice(g, t, dpr, now, meshAlpha);
     } else if (this.phase === 'reveal') {
       const u = ease((now - this.revealStart) / REVEAL_MS);
-      const x0 = this.viewer.offsetX, x1 = this.viewer.offsetX + this.W * this.viewer.zoom;
-      const sx = x0 + (x1 - x0) * u;
-      this.drawPaper(g, t, sx);
-      this.drawWatercolour(g, t, now - this.paintStart, sx);
+      const sx = this.viewer.offsetX + this.W * this.viewer.zoom * u;
       // the scan line: a trailing band and a bright core
       g.save();
       const band = 48 * dpr;
@@ -284,8 +328,6 @@ export class FitShow {
     const px = (k: number) => ox + (A[2 * k] + (B[2 * k] - A[2 * k]) * f) * z;
     const py = (k: number) => oy + (A[2 * k + 1] + (B[2 * k + 1] - A[2 * k + 1]) * f) * z;
     g.save();
-    g.globalAlpha = alpha;
-    // mesh lines
     const path = new Path2D();
     for (let i = 0; i < ny; i += step) {
       for (let j = 0; j < nx; j += step) {
@@ -299,7 +341,6 @@ export class FitShow {
     g.lineWidth = 1 * dpr;
     g.globalAlpha = alpha * (this.dark ? 0.32 : 0.28);
     g.stroke(path);
-    // nodes: a soft halo and a bright core, flickering
     const bucket = Math.floor(now / FLICKER_MS);
     const core = this.dark ? this.colour2 : this.colour;
     for (let i = 0; i < ny; i += step) {
@@ -317,74 +358,4 @@ export class FitShow {
     }
     g.restore();
   }
-
-  /** The random watercolour of the latest snapshot (cached in an offscreen canvas), optionally only right of `clipX`. */
-  private drawWatercolour(g: CanvasRenderingContext2D, t: RoiTransform, age: number, clipX: number | null): void {
-    const snap = this.snap;
-    if (!snap) return;
-    const w = g.canvas.width, hgt = g.canvas.height;
-    // ramps: size and opacity grow in the first second, the colour comes in after half a second
-    const ramp = Math.min(1, age / 1400);
-    const rampQ = Math.round(ramp * 12) / 12; // repaint the cache at most 12 times during the ramp
-    const key = `${w}x${hgt}|${t.zoom}|${t.offsetX}|${t.offsetY}`;
-    if (!this.off || this.off.width !== w || this.off.height !== hgt) {
-      this.off = document.createElement('canvas');
-      this.off.width = w;
-      this.off.height = hgt;
-      this.offG = this.off.getContext('2d');
-      this.painted = { version: -1, key: '', ramp: -1, at: 0 };
-    }
-    const og = this.offG!;
-    const now = performance.now();
-    const stale = this.painted.version !== this.snapVersion && now - this.painted.at >= REPAINT_MIN_MS;
-    if (stale || this.painted.key !== key || this.painted.ramp !== rampQ) {
-      og.clearRect(0, 0, w, hgt);
-      og.globalCompositeOperation = this.dark ? 'source-over' : 'multiply';
-      const N = snap.length / 9;
-      // a random subset (a regular stride would align with the lattice rows): each blob covers the area of its share
-      const keep = Math.min(1, MAX_BLOBS / N);
-      const spread = Math.sqrt(1 / keep);
-      const z = t.zoom;
-      const Lz = this.L * z;
-      const size = (0.35 + 0.95 * ease(Math.min(1, age / 900))) * 1.35 * spread;
-      const alpha = (this.dark ? 0.5 : 0.24) * ease(Math.min(1, age / 1100));
-      const sat = ease(Math.max(0, (age - 450) / 1300));
-      const grey = this.dark ? 150 : 150;
-      og.globalAlpha = alpha;
-      for (let i = 0; i < N; i++) {
-        if (keep < 1 && hash(i * 7 + 3) >= keep) continue;
-        const b = 9 * i;
-        const cx = t.offsetX + snap[b + OFFSET.uv] * this.W * z;
-        const cy = t.offsetY + snap[b + OFFSET.uv + 1] * this.H * z;
-        if (cx < -40 || cy < -40 || cx > w + 40 || cy > hgt + 40) continue;
-        const sx = Math.max(1.5, Math.exp(snap[b + OFFSET.log_s]) * Lz * size);
-        const sy = Math.max(1.5, Math.exp(snap[b + OFFSET.log_s + 1]) * Lz * size);
-        const h0 = hash(i) * 360, h1 = hash(i * 3 + 1);
-        // random hue, mixed with grey while the colour "comes in"
-        const r = Math.round(grey + sat * (this.hueR(h0) * (0.55 + 0.45 * h1) * 255 - grey));
-        const gg = Math.round(grey + sat * (this.hueG(h0) * (0.55 + 0.45 * h1) * 255 - grey));
-        const bb = Math.round(grey + sat * (this.hueB(h0) * (0.55 + 0.45 * h1) * 255 - grey));
-        og.fillStyle = `rgb(${r},${gg},${bb})`;
-        og.beginPath();
-        og.ellipse(cx, cy, sx, sy, -snap[b + OFFSET.rot], 0, 2 * Math.PI);
-        og.fill();
-      }
-      og.globalAlpha = 1;
-      og.globalCompositeOperation = 'source-over';
-      this.painted = { version: this.snapVersion, key, ramp: rampQ, at: now };
-    }
-    g.save();
-    if (clipX !== null) {
-      g.beginPath();
-      g.rect(clipX, 0, w - clipX, hgt);
-      g.clip();
-    }
-    g.drawImage(this.off, 0, 0);
-    g.restore();
-  }
-
-  // pastel hue -> rgb components (0..1), light enough for multiply on paper and lighter on a dark stage
-  private hueR(h: number): number { return 0.62 + 0.38 * Math.max(0, Math.cos((h * Math.PI) / 180)); }
-  private hueG(h: number): number { return 0.62 + 0.38 * Math.max(0, Math.cos(((h - 120) * Math.PI) / 180)); }
-  private hueB(h: number): number { return 0.62 + 0.38 * Math.max(0, Math.cos(((h - 240) * Math.PI) / 180)); }
 }
