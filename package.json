@@ -1,6 +1,9 @@
 {
   "name": "otsr",
   "version": "0.1.2",
+  "author": "Aztech Labs",
+  "homepage": "https://aztech-lab.github.io/OTSR/",
+  "repository": { "type": "git", "url": "https://github.com/Aztech-Lab/OTSR.git" },
   "description": "OTSR: resolution-independent image upscaling with optimal-transport Gaussian lattices, fitted and rendered in the browser on WebGPU.",
   "private": true,
   "type": "module",

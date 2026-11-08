@@ -26,8 +26,10 @@ exports/
 .DS_Store
 Thumbs.db
 
-# sample images (DanbooRegion / Image-GS anime test images, not redistributed here)
-public/samples/
+# sample images: only the bundled sample is tracked
+public/samples/*
+!public/samples/AZ.PNG
+!public/samples/index.json
 
 # local caches (sample sets, screenshots)
 _cache/
