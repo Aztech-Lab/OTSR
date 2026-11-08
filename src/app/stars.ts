@@ -56,8 +56,10 @@ export class Stars {
     const g = canvas.getContext('2d');
     if (!g) throw new Error('2D background unavailable');
     this.g = g;
+    // the counts are for a 1440 x 900 screen; smaller screens (phones) get proportionally fewer sprites
+    const area = Math.max(0.3, Math.min(1, (window.innerWidth * window.innerHeight) / (1440 * 900)));
     const add = (kind: Kind, n: number, make: () => Partial<Star>) => {
-      for (let k = 0; k < n; k++) this.stars.push({ kind, x: Math.random(), y: Math.random(), r: 1, vx: 0, vy: 0, phase: Math.random() * 6.28, rate: 1, flare: false, ...make() });
+      for (let k = 0; k < Math.max(2, Math.round(n * area)); k++) this.stars.push({ kind, x: Math.random(), y: Math.random(), r: 1, vx: 0, vy: 0, phase: Math.random() * 6.28, rate: 1, flare: false, ...make() });
     };
     // huge soft glows: a quarter of the screen across, barely moving, breathing over ~10 s
     add('glow', 8, () => ({ r: 110 + 170 * Math.random() ** 1.3, vx: (Math.random() - 0.5) * 2.4, vy: -(0.6 + 1.6 * Math.random()), rate: 0.25 + 0.25 * Math.random() }));

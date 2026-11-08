@@ -14,6 +14,11 @@ Three layers, from the specification down to the browser:
 3. **Browser smoke test** (`npm run build && npm run smoke`): drives the built app in headless Chrome through the
    `window.otsr` hook — loads a synthetic image, fits, exports, snapshots the three view modes — and writes the
    snapshots to `tools/out/`.
+4. **Phone layout test** (`npm run build && npm run smoke:mobile`): three touch-emulated viewports (portrait phone,
+   sideways phone, tablet) — the start screen, an image, the sheet or the column, a two-finger pinch, a short fit, the
+   menus and dialogs, the report page. Every floating element must stay inside the viewport and nothing may scroll
+   sideways; screenshots go to `tools/out/mobile/`. `--vendor=nvidia` makes it stop unless the browser runs on that
+   GPU.
 
 ## What the GPU tests prove (and the accuracy measured on an RTX 5070 Ti, 2026-10-25)
 

@@ -1,0 +1,92 @@
+/* OTSR design tokens and base elements, shared by the app (style.css) and the technical report (report.css):
+   lab white and near-black with a copper signal, chamfered edges, monospace micro-labels, bilingual labels (.bi).
+   No web fonts. The dark theme is chosen explicitly (data-theme) or follows the system. */
+
+:root {
+  --bg: #ebebe8;
+  --bg-2: #e2e2de;
+  --dot: rgba(20, 22, 20, 0.16);
+  --ink: #111312;
+  --text: #24261f;
+  --muted: #6f726a;
+  --faint: #a3a59d;
+  --line: #c7c8c0;
+  --line-strong: #24261f;
+  --panel: rgba(246, 246, 243, 0.86);
+  --panel-solid: #f4f4f1;
+  --panel-head: #1a1c1a;
+  --panel-head-text: #e8e8e2;
+  --copper: #b8793c;
+  --copper-2: #d9a25f;
+  --copper-soft: rgba(184, 121, 60, 0.14);
+  --solid: #1a1c1a;
+  --solid-text: #f2f1ea;
+  --ok: #4f7a4a;
+  --danger: #b4452f;
+  --shadow: 0 20px 60px rgba(30, 28, 20, 0.14);
+  --vignette: 0; /* the light stage needs no fades; the dark one gets them */
+  --on-copper: #fff; /* text on copper: white on the light theme, black on the dark one */
+  --brand-font: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --sans: var(--brand-font);
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --chamfer: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  --chamfer-sm: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0f1112; --bg-2: #151819; --dot: rgba(232, 232, 226, 0.12); --ink: #f1f1ea; --text: #e2e3dc; --muted: #9ba09a; --faint: #5e635f;
+  --line: #2b302f; --line-strong: #e2e3dc; --panel: rgba(21, 24, 25, 0.86); --panel-solid: #161919; --panel-head: #e6e6df; --panel-head-text: #121413;
+  --copper: #d9a25f; --copper-2: #f0c389; --copper-soft: rgba(217, 162, 95, 0.16); --solid: #e6e6df; --solid-text: #121413;
+  --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1112; --bg-2: #151819; --dot: rgba(232, 232, 226, 0.12); --ink: #f1f1ea; --text: #e2e3dc; --muted: #9ba09a; --faint: #5e635f;
+    --line: #2b302f; --line-strong: #e2e3dc; --panel: rgba(21, 24, 25, 0.86); --panel-solid: #161919; --panel-head: #e6e6df; --panel-head-text: #121413;
+    --copper: #d9a25f; --copper-2: #f0c389; --copper-soft: rgba(217, 162, 95, 0.16); --solid: #e6e6df; --solid-text: #121413;
+    --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; opacity: 0.35; }
+a { color: inherit; text-decoration: underline; text-decoration-color: var(--copper); text-underline-offset: 3px; }
+a:hover { color: var(--copper); }
+:focus-visible { outline: 2px solid var(--copper); outline-offset: 3px; }
+.mono { font-family: var(--mono); }
+.micro { font: 500 10px/1.4 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.key { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid var(--faint); font: 500 9.5px/1 var(--mono); color: var(--muted); }
+.sq { display: inline-block; width: 6px; height: 6px; background: var(--copper); vertical-align: middle; }
+.sq.ok { background: var(--ok); }
+.sq.err { background: var(--danger); }
+.sq.blink { animation: blink 1.1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+/* the bilingual label of every control: the English term, the Traditional Chinese one underneath */
+.bi { display: inline-grid; justify-items: start; text-align: left; line-height: 1; }
+.bi b { font: 700 10.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+.bi small { margin-top: 3px; font: 500 9px/1 var(--sans); letter-spacing: 0.18em; opacity: 0.72; }
+.zh { font-family: var(--sans); letter-spacing: 0.18em; text-transform: none; }
+
+/* ---- buttons: everything clickable has an edge, a fill on hover, or both ----------------------------------------- */
+.btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; height: 44px; padding: 0 16px; border: 1px solid var(--line-strong); color: var(--ink); clip-path: var(--chamfer-sm); transition: background 0.15s, color 0.15s; text-decoration: none; }
+.btn:hover:not(:disabled) { background: var(--copper-soft); color: var(--ink); }
+.btn.solid { background: var(--solid); color: var(--solid-text); border-color: transparent; }
+.btn.solid:hover:not(:disabled) { background: var(--copper); color: var(--on-copper); }
+.btn.copper { background: var(--copper); color: var(--on-copper); border-color: transparent; }
+.btn.copper:hover:not(:disabled) { background: var(--copper-2); color: var(--on-copper); }
+.btn.big { width: 100%; height: 52px; }
+.btn.big .bi b { font-size: 12px; }
+.btn .arrow { font-size: 14px; }
+.textbtn { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 9px; border: 1px solid var(--line); color: var(--text); transition: color 0.15s, border-color 0.15s, background 0.15s; text-decoration: none; }
+.textbtn:hover:not(:disabled) { color: var(--copper); border-color: var(--copper); background: var(--copper-soft); }
+.textbtn.on, .textbtn.active { color: var(--copper); border-color: var(--copper); }
+.textbtn.head { color: inherit; border-color: currentColor; opacity: 0.85; }
+.textbtn .bi b { font-weight: 600; }
+.textbtn .arrow { font-size: 13px; }

@@ -14,6 +14,7 @@ data.
 | `npm run serve` | serves `dist/` (what `serve.bat` runs) |
 | `npm test` / `npm run test:gpu` / `npm run test:all` | unit / GPU / both |
 | `npm run smoke` | browser smoke test of `dist/` |
+| `npm run smoke:mobile` | phone / tablet layout test of `dist/` (touch emulation, three viewports, the report page) |
 | `npm run bench -- image.rgb.bin --adapter=4090` | end-to-end timing in Node (see performance.md) |
 | `npm run golden` | regenerate `tests/golden/` from the Python reference |
 | `npm run probe:dawn` / `npm run probe:webgpu` | adapter probes for Node (Dawn) / headless Chrome |
@@ -34,7 +35,7 @@ src/engine/fit.ts         the fitting loop (runFit)
 src/engine/sinkhorn.ts    GPU Sinkhorn (transportMap);  otinit.ts: the whole initialisation
 src/engine/edges.ts       the edge pass;  present.ts: canvas presentation + classic resampling;  export.ts: tiled render
 src/engine/shaders/*.wgsl the kernels
-src/app/main.ts           bootstrap: device, viewer, panel, shortcuts, header, drag & drop / paste, window.otsr
+src/app/main.ts           bootstrap: device, viewer, panel, layout insets, shortcuts, header, drag & drop / paste, window.otsr
 src/app/store.ts          the application state and persisted preferences (one store, one subscribe)
 src/app/jobs.ts           the job runner: one GPU job at a time, progress, cancel, error reporting
 src/app/actions.ts        the operations behind the buttons (open, fit, export, save / load, samples, region tool)
@@ -42,7 +43,9 @@ src/app/panel.ts          the side panel for the current mode (simple / research
 src/app/viewer.ts         WebGPU canvas + 2-D overlay: pan / zoom, split comparison, hold-to-peek, region tool
 src/app/roi.ts            the shared region-of-interest model (drawing, editing, clamping)
 src/app/presets.ts        quality presets and the time / memory estimates
-src/app/shortcuts.ts      keyboard shortcuts;  toast.ts: notifications;  dom.ts: h() and the Lucide icons;  image.ts: decoding, PNG, downloads
+src/app/shortcuts.ts      keyboard shortcuts;  toast.ts: notifications;  dom.ts: h(), bilingual labels, formats;  image.ts: decoding, PNG, downloads
+src/tokens.css            design tokens and base elements, shared by the app (style.css) and the report (report.css)
+report.html, src/report.ts the technical report page (second Vite entry)
 ```
 
 The engine has no dependency on the DOM except `present.ts` (canvas format) and can run in Node (the tests and

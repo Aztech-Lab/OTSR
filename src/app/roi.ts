@@ -119,6 +119,13 @@ export class RoiTool {
     this.onChange?.(this.roi, true);
   }
 
+  /** Abandons the drag (a second finger turned it into a pinch): the region goes back to what it was before begin(). */
+  cancel(before: Roi | null): void {
+    if (!this.drag) return;
+    this.drag = null;
+    this.set(before);
+  }
+
   get dragging(): boolean {
     return this.drag !== null;
   }

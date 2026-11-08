@@ -177,7 +177,7 @@ Two kinds of comparison closed the loop:
   43.62 vs 43.55 dB and 46.49 vs 46.48 dB — equivalent within the noise of two independent fits — in 33 s vs 0.6 s.
   The 60× is not the kernels; it is the absence of Python, autograd and per-kernel synchronisation.
 - **Same GPU and budget, SAD's official CUDA trainer vs the engine** (5070 Ti, SAD's initialisation not even
-  counted): higher final PSNR on all four images (+1.7 to +6.6 dB) in 40–55 % of the time, with the time-PSNR curve
+  counted): higher final PSNR on all four images (+1.7 to +6.6 dB) in 38–60 % of the time, with the time-PSNR curve
   above SAD's from 0.2 s onwards. The gain in quality is the representation and the OT initialisation; the gain in
   time is the pipeline (no sorting, one-pass exact gradients, no densify/prune machinery).
 

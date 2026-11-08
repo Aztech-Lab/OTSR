@@ -26,8 +26,14 @@ const $ = <T extends HTMLElement>(id: string): T => {
 
 const ZOOM_STOPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32];
 const PROGRESS_CELLS = 24;
-const CONSOLE_W = 400 + 40 + 40; // console width + margins = left inset while it is open
-const MONITOR_W = 320 + 40 + 24;
+/** The phone / small-tablet layout of style.css: the console is a bottom sheet, the zoom bar sits on it. */
+const COMPACT = matchMedia('(max-width: 960px)');
+/** Phones held sideways: the console is a column on the left instead of a sheet. */
+const LANDSCAPE = matchMedia('(max-width: 960px) and (max-height: 520px) and (orientation: landscape)');
+/** Portrait phones and small tablets, where the sheet folds away while the image is the point. */
+const sheetLayout = () => COMPACT.matches && !LANDSCAPE.matches;
+/** Layout geometry of a fixed element without CSS transforms (the entering animation slides panels in). */
+const box = (el: HTMLElement) => ({ left: el.offsetLeft, top: el.offsetTop, right: el.offsetLeft + el.offsetWidth, bottom: el.offsetTop + el.offsetHeight, width: el.offsetWidth, height: el.offsetHeight });
 const LAYER_ROWS: [keyof Layers, string, string, string][] = [
   ['vector', 'Vector view', '矢量視角', 'every Gaussian in a random colour × its luma (V)'],
   ['ot', 'OT lattice', '傳輸網格', 'the transport lattice of the initialisation over the image (T)'],
@@ -82,14 +88,23 @@ async function boot(): Promise<void> {
   const store = new Store();
   applyLook(store.state.prefs.theme, store.state.prefs.motion !== false);
   const log = bootLog();
-  log('SYS.INIT // OTSR 0.1.2');
+  log('SYS.INIT // OTSR 0.1.3');
   const status = $('status');
   const statusDot = $('status-dot');
   const readoutValue = $('readout-value');
   const readoutSub = $('readout-sub');
   const consoleState = $('console-state');
-  const consoleTitle = $('console-title');
   const segCount = $('seg-count');
+  // the mode switch in the console's title bar
+  const modeHead = $('mode-head');
+  const modeButtons = (['simple', 'research'] as Mode[]).map((m) => {
+    const b = h('button', { role: 'radio', onClick: () => store.setPrefs({ mode: m }) }, h('b', null, m === 'simple' ? 'Simple' : 'Research'), h('small', null, m === 'simple' ? '簡單' : '科研'));
+    modeHead.append(b);
+    return [m, b] as const;
+  });
+  // on touch screens there is nothing to drop or paste from a keyboard
+  if (matchMedia('(pointer: coarse)').matches) { $('empty-title').textContent = 'Choose image'; $('empty-zh').textContent = '選擇 · 貼上'; }
+  $('report-chip').addEventListener('click', (e) => e.stopPropagation()); // the wordmark around it goes home
   const segCells = Array.from({ length: 12 }, () => h('i'));
   segCount.replaceChildren(...segCells);
   // entering the canvas: the instrument collapses, the image irises open, brackets and panels fly in (CSS, body.entering)
@@ -109,14 +124,17 @@ async function boot(): Promise<void> {
     }
     statusDot.className = `sq ${s.job ? 'blink' : s.status.error ? 'err' : 'ok'}`;
     const empty = !s.image && !s.model;
-    if (wasEmpty && !empty) enter();
+    if (wasEmpty && !empty) {
+      enter();
+      if (sheetLayout() && s.prefs.panelLeft !== false) store.setPrefs({ panelLeft: false }); // the image first; the sheet is a tap away
+    }
     wasEmpty = empty;
     document.body.classList.toggle('empty', empty);
     document.body.classList.toggle('has-fit', !!s.lastFit && !s.job);
     readoutValue.textContent = s.lastFit ? s.lastFit.psnr.toFixed(2) : '—';
     readoutSub.textContent = s.lastFit ? `${s.lastFit.count.toLocaleString('en-US')} GAUSSIANS // ${s.lastFit.steps.toLocaleString('en-US')} STEPS // ${(s.lastFit.seconds).toFixed(1)} S` : '';
     consoleState.replaceChildren(h('span', { class: `sq ${s.job ? 'blink' : 'ok'}` }), ` ${s.job ? 'running' : s.model ? 'fitted' : 'idle'}`);
-    consoleTitle.textContent = s.prefs.mode === 'research' ? 'Control // research' : 'Control // 01';
+    for (const [m, b] of modeButtons) { b.classList.toggle('on', s.prefs.mode === m); b.setAttribute('aria-checked', String(s.prefs.mode === m)); }
     const frac = s.job ? Math.max(0, s.job.fraction) : 0;
     segCells.forEach((c, i) => c.classList.toggle('on', s.job ? i < Math.round(frac * 12) : false));
   });
@@ -151,6 +169,7 @@ async function boot(): Promise<void> {
   const gpuLabel = info.description || info.device || [info.vendor, info.architecture].filter(Boolean).join(' ') || 'GPU';
   gpuName.textContent = `GPU ${gpuLabel}`;
   $('corner-gpu').textContent = `GPU: ${gpuLabel}`;
+  $('settings-gpu').textContent = gpuLabel;
   gpuName.title = `${info.vendor} ${info.architecture} ${info.device}${info.isFallback ? ' — software fallback!' : ''}`;
   if (info.isFallback) toast('WebGPU is running on a software fallback adapter; fits will be very slow.', 'error');
 
@@ -158,18 +177,42 @@ async function boot(): Promise<void> {
   const view = $('view');
   new Stars($<HTMLCanvasElement>('stars'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches, () => store.state.prefs.stars !== false);
   const zoombar = $('toolbar');
-  // keep the fitted image clear of the console (left), the monitor (right), the command block (top) and the bottom bars
+  const inspector = $('inspector');
+  const monitorEl = $('monitor');
+  const command = $('command');
+  // keep the fitted image clear of the console (left), the monitor (right), the command block (top) and the bottom
+  // bars, measured from the elements themselves; on the compact layout the sheet's height also docks the zoom bar
   const setInsets = () => {
-    const narrow = window.innerWidth <= 960;
-    const left = narrow ? 10 : store.state.prefs.panelLeft !== false ? CONSOLE_W : 64;
-    const right = narrow ? 10 : store.state.monitor ? MONITOR_W : 48;
-    viewer.insets = narrow
-      ? { left, top: 150, right, bottom: Math.round(window.innerHeight * 0.52) + 20 }
-      : { left, top: 124, right, bottom: 230 };
-    zoombar.style.left = narrow ? '' : `${(left + (window.innerWidth - right)) / 2}px`;
+    const vw = window.innerWidth;
+    const open = store.state.prefs.panelLeft !== false;
+    const loaded = !!(store.state.image || store.state.model);
+    if (viewer.rulers === COMPACT.matches) { viewer.rulers = !COMPACT.matches; viewer.refreshOverlay(); }
+    if (COMPACT.matches) {
+      const cmd = box(command);
+      const top = Math.round(cmd.height ? cmd.bottom + 10 : 60);
+      if (LANDSCAPE.matches) {
+        document.documentElement.style.setProperty('--sheet-h', '0px');
+        const left = open && loaded ? box(inspector).right + 10 : 10;
+        viewer.setInsets({ left, top, right: 10, bottom: box(zoombar).height + 20 });
+      } else {
+        const sheetH = loaded ? box(inspector).height : 0;
+        document.documentElement.style.setProperty('--sheet-h', `${sheetH}px`);
+        viewer.setInsets({ left: 10, top, right: 10, bottom: sheetH + 58 });
+      }
+      zoombar.style.left = '';
+      return;
+    }
+    const left = open ? box(inspector).right + 40 : 64;
+    const right = store.state.monitor ? vw - box(monitorEl).left + 24 : 48;
+    viewer.setInsets({ left, top: 124, right, bottom: 230 });
+    zoombar.style.left = `${(left + (vw - right)) / 2}px`;
   };
   setInsets();
   window.addEventListener('resize', setInsets);
+  COMPACT.addEventListener('change', setInsets);
+  LANDSCAPE.addEventListener('change', setInsets);
+  new ResizeObserver(() => setInsets()).observe(inspector);
+  new ResizeObserver(() => setInsets()).observe(command);
   const syncStage = () => {
     viewer.background = stageColor();
     viewer.requestRender();
@@ -340,11 +383,26 @@ async function boot(): Promise<void> {
     if (e.key === 'Home' && !(t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'))) { e.preventDefault(); void goHome(); }
   });
 
-  // panels: the console collapses to a tab on the left; the monitor opens during fits and from a tab on the right
+  // panels: the console collapses to a tab on the left (on phones: to its title bar); the monitor opens during fits
+  // and from a tab on the right
   $('console-bookmark').addEventListener('click', () => store.setPrefs({ panelLeft: false }));
   $('left-tab').addEventListener('click', () => store.setPrefs({ panelLeft: true }));
+  $('console-toggle').addEventListener('click', () => store.setPrefs({ panelLeft: store.state.prefs.panelLeft === false }));
   $('monitor-bookmark').addEventListener('click', () => store.set({ monitor: false }));
   $('right-tab').addEventListener('click', () => store.set({ monitor: true }));
+  // on portrait phones the sheet folds away while a fit runs, so the process is visible, and opens afterwards on
+  // the result and the export controls
+  let foldedForFit = false;
+  store.subscribe((s, changed) => {
+    if (!changed.has('job')) return;
+    if (s.job?.name === 'Fit' && sheetLayout() && !foldedForFit) {
+      foldedForFit = true;
+      if (s.prefs.panelLeft !== false) store.setPrefs({ panelLeft: false });
+    } else if (!s.job && foldedForFit) {
+      foldedForFit = false;
+      if (s.prefs.panelLeft === false) store.setPrefs({ panelLeft: true });
+    }
+  });
 
   // system navigation, the theme button and the settings
   const themeBtn = $('theme-btn');
@@ -396,7 +454,7 @@ async function boot(): Promise<void> {
     tbView.classList.toggle('active', Object.values(s.layers).some(Boolean));
     document.body.dataset.mode = s.prefs.mode;
     document.body.classList.toggle('busy', !!s.job);
-    document.body.classList.toggle('left-closed', s.prefs.panelLeft === false);
+    document.body.classList.toggle('left-closed', s.prefs.panelLeft === false && !!(s.image || s.model));
     document.body.classList.toggle('monitor-open', s.monitor);
     document.body.classList.toggle('has-regions', s.regions.length > 0);
     if (changed.has('prefs') || changed.has('monitor')) setInsets();
@@ -404,7 +462,7 @@ async function boot(): Promise<void> {
       viewer.markers = s.monitor || s.job ? s.regions : [];
       viewer.refreshOverlay();
     }
-    placeFrame();
+    if (changed.has('zoom') || changed.has('image') || changed.has('model')) placeFrame();
   });
 
   // drag & drop, paste, file picker
@@ -433,15 +491,19 @@ async function boot(): Promise<void> {
   $('empty-open').addEventListener('click', () => picker.click());
   installShortcuts(store, actions, viewer, () => picker.click(), toggleHelp);
 
-  // sample images, when the build ships them: the Load-sample button loads the one chosen in the select
+  // sample images, when the build ships them: the Load-sample button loads the one chosen in the select (no select
+  // when there is only one)
   void actions.sampleList().then((list) => {
     if (!list.length) return;
     const box = $('empty-samples');
     const sel = h('select', { 'aria-label': 'Sample image' }, ...list.map((e) => h('option', { value: e.file }, `${e.file} (${e.w} × ${e.h})`)));
-    box.replaceChildren(h('span', { class: 'micro' }, 'Sample · 樣本'), sel);
-    box.hidden = false;
+    if (list.length > 1) {
+      box.replaceChildren(h('span', { class: 'micro' }, 'Sample · 樣本'), sel);
+      box.hidden = false;
+    }
     const btn = $('empty-sample');
     btn.hidden = false;
+    btn.title = `${list[0].file} · ${list[0].w} × ${list[0].h}`;
     btn.addEventListener('click', () => void actions.loadSample(sel.value));
   });
 

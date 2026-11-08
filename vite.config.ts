@@ -1,9 +1,16 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   // Relative asset paths: the build runs from any folder or sub-path (GitHub Pages, a local static server).
   base: './',
-  build: { target: 'es2022', outDir: 'dist', sourcemap: true },
+  build: {
+    target: 'es2022',
+    outDir: 'dist',
+    sourcemap: true,
+    // two pages: the app and the technical report
+    rollupOptions: { input: { main: fileURLToPath(new URL('index.html', import.meta.url)), report: fileURLToPath(new URL('report.html', import.meta.url)) } },
+  },
   test: {
     projects: [
       {

@@ -49,6 +49,10 @@ export interface ViewerEvents {
 const MIN_ZOOM = 1 / 32;
 const MAX_ZOOM = 64;
 const SPLIT_GRAB_PX = 10;
+/** The tile-entry check after a render (one small read-back) runs at most this often while the view moves. */
+const ENTRY_CHECK_MS = 120;
+/** Canvas resizes are coalesced over this long (phone browsers resize the viewport while their bars slide). */
+const RESIZE_SETTLE_MS = 60;
 /** Gaussian outlines are drawn from this zoom on (below it they are sub-pixel) and up to this many per frame. */
 const OUTLINE_MIN_ZOOM = 2;
 const OUTLINE_MAX = 60000;
@@ -96,9 +100,22 @@ export class Viewer {
   zoom = 1;
   offsetX = 0;
   offsetY = 0;
+  /** True while the view is the "fit to view" placement (cleared by any zoom or pan), so layout changes can keep it. */
+  fitted = false;
   readonly roi = new RoiTool();
   events: ViewerEvents = {};
   private tool: Tool = 'pan';
+  private resizeTimer = 0;
+  private entryCheckAt = 0;
+  private entryCheckZoom = 0;
+  private entryCheckBusy = false;
+  private entryCheckAgain = false;
+  private entryCheckTimer = 0;
+  /** Active pointers on the stage (touch: two of them pinch-zoom). */
+  private readonly pointers = new Map<number, [number, number]>();
+  private pinch: { dist: number; mx: number; my: number } | null = null;
+  /** The region before a region drag began (restored when the drag turns into a pinch). */
+  private roiBefore: Roi | null = null;
   private model: ViewerModel | null = null;
   private source: ViewerSource | null = null;
   private readonly device: GPUDevice;
@@ -114,7 +131,7 @@ export class Viewer {
   private width = 0;
   private height = 0;
   private pending = false;
-  private drag: 'pan' | 'split' | 'roi' | null = null;
+  private drag: 'pan' | 'split' | 'roi' | 'pinch' | null = null;
   private lastX = 0;
   private lastY = 0;
   private holdMode: ViewMode | null = null;
@@ -144,7 +161,10 @@ export class Viewer {
       this.drawOverlay();
       this.events.onRoiChange?.(roi, final);
     };
-    new ResizeObserver(() => this.resize()).observe(canvas);
+    new ResizeObserver(() => {
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = window.setTimeout(() => this.resize(), this.width ? RESIZE_SETTLE_MS : 0);
+    }).observe(canvas);
     this.resize();
     this.bindPointer();
   }
@@ -274,7 +294,16 @@ export class Viewer {
     this.zoom = Math.max(MIN_ZOOM, Math.min(w / s.W, h / s.H));
     this.offsetX = x0 + (w - s.W * this.zoom) / 2;
     this.offsetY = y0 + (h - s.H * this.zoom) / 2;
+    this.fitted = true;
     this.changed();
+  }
+
+  /** New insets (a panel opened, the sheet grew): a fitted image is fitted again, anything else stays where it is. */
+  setInsets(insets: { left: number; top: number; right: number; bottom: number }): void {
+    const i = this.insets;
+    if (i.left === insets.left && i.top === insets.top && i.right === insets.right && i.bottom === insets.bottom) return;
+    this.insets = insets;
+    if (this.fitted) this.fitToView();
   }
 
   /** Sets the zoom, keeping the source point under canvas position (cx, cy) fixed (default: the centre). */
@@ -285,6 +314,7 @@ export class Viewer {
     this.zoom = z;
     this.offsetX = cx - sx * z;
     this.offsetY = cy - sy * z;
+    this.fitted = false;
     this.changed();
   }
 
@@ -300,6 +330,7 @@ export class Viewer {
     this.zoom = z;
     this.offsetX = x0 + (w - roi.w * z) / 2 - roi.x * z;
     this.offsetY = y0 + (h - roi.h * z) / 2 - roi.y * z;
+    this.fitted = false;
     this.changed();
   }
 
@@ -336,7 +367,7 @@ export class Viewer {
     this.width = w;
     this.height = h;
     this.rebuild();
-    if (first) this.fitToView();
+    if (first || this.fitted) this.fitToView();
     else {
       // keep the source point at the centre of the view where it was
       this.offsetX = w / 2 - cx * this.zoom;
@@ -390,6 +421,7 @@ export class Viewer {
     const enc = this.device.createCommandEncoder({ label: 'viewer' });
     const modelMode = this.mode === 'otsr' || this.mode === 'raw';
     let main: GPUBuffer;
+    let built: Rasterizer | null = null;
     if (modelMode && this.model && this.raster) {
       // below native resolution, prefilter with the pixel footprint (std 1/2 output px of the missing detail)
       view.aa = this.zoom < 1 ? 0.5 * Math.sqrt(1 - this.zoom * this.zoom) : 0;
@@ -402,13 +434,7 @@ export class Viewer {
         this.edge.encode(enc, this.raster.out, this.bufA, this.zoom, { edgePx: this.edgePx });
         main = this.bufA;
       }
-      const raster = this.raster;
-      raster.readTotalEntries().then((total) => {
-        if (raster === this.raster && total > raster.entryCap) {
-          raster.growEntries(Math.ceil(total * 1.5));
-          this.requestRender();
-        }
-      }).catch(() => undefined);
+      built = this.raster;
     } else if (this.source) {
       const mode: ResampleMode = modelMode ? 'bicubic' : (this.mode as ResampleMode);
       view.aa = 0;
@@ -426,6 +452,37 @@ export class Viewer {
     }
     this.presenter.encode(enc, main, this.width, this.height, target, { rect: this.imageRect(s), compare, background: this.background });
     this.device.queue.submit([enc.finish()]);
+    if (built) this.checkEntries(built); // after the submit: the read-back is queued behind this frame's build
+  }
+
+  /**
+   * Did the tile lists of the build just submitted fit? One 4-byte read-back, queued behind it; at most one in flight,
+   * and while the view only moves (same zoom) no more than every ENTRY_CHECK_MS — a zoom step is checked right away.
+   * A check that cannot run now is deferred, never dropped, so the last frame of a burst is checked too; a truncated
+   * frame can therefore show for a few dozen milliseconds during a pan, then the grown lists re-render.
+   */
+  private checkEntries(raster: Rasterizer): void {
+    if (this.entryCheckBusy) { this.entryCheckAgain = true; return; }
+    const now = performance.now();
+    const zoomJump = Math.abs(Math.log2(this.zoom / (this.entryCheckZoom || this.zoom))) > 0.25;
+    const wait = zoomJump ? 0 : ENTRY_CHECK_MS - (now - this.entryCheckAt);
+    if (wait > 0) {
+      if (!this.entryCheckTimer) this.entryCheckTimer = window.setTimeout(() => { this.entryCheckTimer = 0; if (this.raster) this.checkEntries(this.raster); }, wait);
+      return;
+    }
+    this.entryCheckBusy = true;
+    this.entryCheckAgain = false;
+    this.entryCheckAt = now;
+    this.entryCheckZoom = this.zoom;
+    raster.readTotalEntries().then((total) => {
+      if (raster === this.raster && total > raster.entryCap) {
+        raster.growEntries(Math.ceil(total * 1.5));
+        this.requestRender();
+      }
+    }).catch(() => undefined).finally(() => {
+      this.entryCheckBusy = false;
+      if (this.entryCheckAgain && this.raster) { this.entryCheckAgain = false; this.checkEntries(this.raster); }
+    });
   }
 
   private drawOverlay(): void {
@@ -474,7 +531,7 @@ export class Viewer {
       // labels just below the command block
       const labelL = this.compareWith.charAt(0).toUpperCase() + this.compareWith.slice(1);
       const labelR = this.mode === 'raw' ? 'Gaussians' : 'OTSR';
-      const ly = (this.insets.top + 12) * dpr;
+      const ly = Math.max((this.insets.top + 12) * dpr, Math.min(y0 - 34 * dpr, this.height - 40 * dpr));
       this.label(g, labelL, x - 10 * dpr, ly, 'right', dpr);
       this.label(g, labelR, x + 10 * dpr, ly, 'left', dpr);
       g.restore();
@@ -660,6 +717,13 @@ export class Viewer {
     return [(e.clientX - r.left) * this.dpr, (e.clientY - r.top) * this.dpr];
   }
 
+  /** Distance and midpoint of the first two active pointers (device pixels). */
+  private pinchState(): { dist: number; mx: number; my: number } | null {
+    if (this.pointers.size < 2) return null;
+    const [a, b] = [...this.pointers.values()];
+    return { dist: Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1])), mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2 };
+  }
+
   private bindPointer(): void {
     const c = this.input;
     c.style.cursor = 'grab';
@@ -667,13 +731,22 @@ export class Viewer {
       if (e.button !== 0) return;
       const [x, y] = this.canvasPos(e);
       const t = this.transform();
-      c.setPointerCapture(e.pointerId);
+      try { c.setPointerCapture(e.pointerId); } catch { /* synthetic pointers (tests) cannot be captured */ }
+      this.pointers.set(e.pointerId, [x, y]);
+      if (this.pointers.size >= 2) {
+        // a second finger: whatever the first one was doing becomes a pinch (zoom about the midpoint + pan with it)
+        if (this.drag === 'roi') this.roi.cancel(this.roiBefore);
+        this.drag = 'pinch';
+        this.pinch = this.pinchState();
+        return;
+      }
       this.lastX = x;
       this.lastY = y;
       if (this.splitVisible && Math.abs(x - this.splitFrac * this.width) <= SPLIT_GRAB_PX * this.dpr) {
         this.drag = 'split';
       } else if (this.tool === 'roi' && t) {
         const [sx, sy] = this.toSource(x, y);
+        this.roiBefore = this.roi.roi;
         this.roi.begin(sx, sy, t);
         this.drag = 'roi';
       } else {
@@ -684,11 +757,29 @@ export class Viewer {
     c.addEventListener('pointermove', (e) => {
       const [x, y] = this.canvasPos(e);
       const t = this.transform();
+      if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, [x, y]);
+      if (this.drag === 'pinch') {
+        const p = this.pinchState();
+        if (p && this.pinch) {
+          const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom * (p.dist / this.pinch.dist)));
+          // the source point under the old midpoint moves to the new midpoint, at the new zoom
+          const sx = (this.pinch.mx - this.offsetX) / this.zoom;
+          const sy = (this.pinch.my - this.offsetY) / this.zoom;
+          this.zoom = z;
+          this.offsetX = p.mx - sx * z;
+          this.offsetY = p.my - sy * z;
+          this.fitted = false;
+          this.pinch = p;
+          this.changed();
+        }
+        return;
+      }
       if (this.drag === 'pan') {
         this.offsetX += x - this.lastX;
         this.offsetY += y - this.lastY;
         this.lastX = x;
         this.lastY = y;
+        this.fitted = false;
         this.changed();
       } else if (this.drag === 'split') {
         this.splitFrac = Math.max(0.02, Math.min(0.98, x / this.width));
@@ -712,13 +803,24 @@ export class Viewer {
       }
     });
     c.addEventListener('pointerleave', () => { if (this.hoverOn) { this.hoverOn = false; this.events.onHover?.(null, null); } });
-    const stop = () => {
+    const stop = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      if (this.drag === 'pinch') {
+        if (this.pointers.size >= 2) { this.pinch = this.pinchState(); return; }
+        // one finger left: it continues as a pan from where it is
+        const rest = [...this.pointers.values()][0];
+        this.pinch = null;
+        if (rest) { this.drag = 'pan'; [this.lastX, this.lastY] = rest; return; }
+      }
+      if (this.pointers.size) return; // another pointer is still down
       if (this.drag === 'roi') this.roi.end();
       this.drag = null;
       c.style.cursor = this.tool === 'roi' ? 'crosshair' : 'grab';
     };
     c.addEventListener('pointerup', stop);
     c.addEventListener('pointercancel', stop);
+    // Safari's own page pinch would otherwise zoom the whole page
+    document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
       const [x, y] = this.canvasPos(e);
@@ -775,6 +877,8 @@ export class Viewer {
   }
 
   destroy(): void {
+    clearTimeout(this.resizeTimer);
+    clearTimeout(this.entryCheckTimer);
     this.errorMap?.close();
     this.raster?.destroy();
     this.edge?.destroy();

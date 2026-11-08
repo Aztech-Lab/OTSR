@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://aztech-lab.github.io/OTSR/">Live app</a> ·
+  <a href="https://aztech-lab.github.io/OTSR/report.html">Technical report</a> ·
   <a href="docs/getting-started.md">Getting started</a> ·
   <a href="docs/method.md">The method</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
@@ -15,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.1.2" src="https://img.shields.io/badge/version-0.1.2-c47a3a">
+  <img alt="version 0.1.3" src="https://img.shields.io/badge/version-0.1.3-c47a3a">
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-2b2b2b">
   <img alt="WebGPU" src="https://img.shields.io/badge/runs%20on-WebGPU-2b2b2b">
 </p>
@@ -34,8 +35,8 @@ repository is its self-contained, browser-side implementation, by [Aztech Labs](
 ## Try it
 
 **[aztech-lab.github.io/OTSR](https://aztech-lab.github.io/OTSR/)** — open it in Chrome or Edge 113+ (Windows, macOS,
-Linux, Android) or Safari 26+ (macOS, iOS), on a machine with a GPU. Integrated GPUs work; a discrete GPU is much
-faster. Then:
+Linux, Android) or Safari 26+ (macOS, iOS), on a machine with a GPU. Integrated GPUs and phones work; a discrete GPU
+is much faster. Then:
 
 1. Press **Load sample**, or **Open image** / drop / paste an image of your own.
 2. Pick a preset (Fast / Standard / Best) and press **Enhance**. While it runs the stage plays the real process: the
@@ -46,6 +47,10 @@ faster. Then:
    vector view, the OT lattice, the 1σ outlines and the error map.
 4. **Export** as PNG, JPEG, WebP, AVIF or BMP at 1×–16× or any scale, or **Save .otsr** to keep the model (a few MB,
    re-renderable at any size later with **Load .otsr**).
+
+On a phone the console is a sheet at the bottom (tap its title bar to open or fold it), two fingers zoom, and the
+rest is the same. The **[technical report](https://aztech-lab.github.io/OTSR/report.html)** explains the method, the
+engine and the research behind it on one page.
 
 **Research** mode opens every parameter (Gaussians per pixel, steps, edge width, L1 / L2 loss), the split comparison
 against any resampler, the region tool and the session information with the PSNR curve. Everything has a keyboard
@@ -106,7 +111,7 @@ The Python reference (`reference/`) is the executable specification: it regenera
 ## Repository layout
 
 ```
-index.html, src/app/      the web UI (viewer, panels, monitor, export)
+index.html, src/app/      the web UI (viewer, panels, monitor, export); report.html, src/report.*: the technical report
 src/engine/               the WebGPU engine: TypeScript orchestration + WGSL kernels (src/engine/shaders/)
 src/core/                 CPU-side model code: constants, OT initialisation maths, the .otsr file format
 reference/otsr_ref/       Python reference implementation (PyTorch, dense, float64-capable)
@@ -121,6 +126,7 @@ docs/                     documentation (method, engine, file format, testing, p
 
 | Version | What it brought |
 |---|---|
+| **0.1.3** | **Phones**: a bottom-sheet layout with pinch zoom, a column layout sideways; the **technical report** page; the mode switch in the console's title bar and a console that keeps its width; less work per frame. |
 | **0.1.2** | The extras and the **vector view**: the model in Gaussian-id colours, the fit animation (OT lattice → Gaussians → scan reveal), the monitor panel, the View menu (vector / OT lattice / outlines / error map), export as PNG / JPEG / WebP / AVIF / BMP, a process log, notices in the status strip, bilingual labels, starlight and geometry on the stage, the way back to the start screen. |
 | **0.1.1** | **Research mode**: custom budget and steps, edge width, L1 / L2 loss, view modes and split against any resampler, 1σ outlines, error map, region tool, session info with the PSNR curve. |
 | **0.1.0** | First public version: the WebGPU engine and the UI in the lab-white / copper design, the `.otsr` format, the Python reference and the golden tests. |

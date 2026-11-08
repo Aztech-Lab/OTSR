@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>OTSR</title>
   <meta name="description" content="Resolution-independent image upscaling with optimal-transport Gaussian lattices, fitted and rendered in your browser on WebGPU.">
   <meta name="color-scheme" content="light dark">
@@ -39,7 +39,7 @@
   <div id="frame" class="frame" hidden><i></i><i></i><i></i><i></i><span class="tag" id="frame-tag">SAMPLE // 01</span><span class="scan"></span></div>
 
   <header class="float brand" id="brand" title="Back to the start screen (Home) · 回到主頁" aria-label="OTSR">
-    <div class="row1"><h1>OTSR</h1><span class="badge">V0.1.2</span></div>
+    <div class="row1"><h1>OTSR</h1><span class="badge">V0.1.3</span><a class="chip" id="report-chip" href="report.html" target="_blank" rel="noopener" title="Technical report · 技術報告">Report<small>技術報告</small><span class="arrow">↗</span></a></div>
     <div class="row2"><span class="barcode" aria-hidden="true"></span><span class="micro">Optimal-transport Gaussian super-resolution</span></div>
   </header>
 
@@ -58,9 +58,9 @@
   </div>
 
   <nav class="float sysnav" aria-label="System">
-    <button id="nav-open" class="navbtn" title="Open an image (O)"><span class="key">O</span><span class="bi"><b>Open</b><small>開啟</small></span></button>
+    <button id="nav-open" class="navbtn" title="Open an image (O)"><span class="glyph" aria-hidden="true">＋</span><span class="key">O</span><span class="bi"><b>Open</b><small>開啟</small></span></button>
     <button id="theme-btn" class="themebtn" title="Switch between the light and the dark theme" aria-pressed="false"><span class="ico" id="theme-ico">☾</span><span class="two"><b id="theme-en">Dark mode</b><small id="theme-zh">深色模式</small></span></button>
-    <button id="settings-btn" class="navbtn" title="Settings"><span class="bi"><b>Settings</b><small>設定</small></span><span class="key">⚙</span></button>
+    <button id="settings-btn" class="navbtn" title="Settings"><span class="glyph" aria-hidden="true">⚙</span><span class="bi"><b>Settings</b><small>設定</small></span><span class="key">⚙</span></button>
     <button id="help-btn" class="navbtn" title="Keyboard shortcuts (?)"><span class="key">?</span><span class="bi"><b>Keys</b><small>快捷鍵</small></span></button>
   </nav>
 
@@ -83,10 +83,11 @@
     </svg>
     <div class="center">
       <div class="micro">■ Input required</div>
-      <h2>Drop image</h2>
-      <div class="zh">拖入 · 貼上 · 選擇</div>
+      <h2 id="empty-title">Drop image</h2>
+      <div class="zh" id="empty-zh">拖入 · 貼上 · 選擇</div>
       <div class="open pair"><button id="empty-sample" class="btn pale" hidden><span class="bi"><b>Load sample</b><small>載入樣本</small></span><span class="arrow">↓</span></button><button id="empty-open" class="btn copper"><span class="bi"><b>Open image</b><small>開啟圖片</small></span><span class="arrow">→</span></button></div>
       <div id="empty-samples" class="samplesel" hidden></div>
+      <a class="report" id="empty-report" href="report.html" target="_blank" rel="noopener"><span class="bi"><b>Technical report</b><small>技術報告 · 原理與過程</small></span><span class="arrow">↗</span></a>
     </div>
     <span class="corner-note tl">// Any size<br>// Any aspect ratio</span>
     <span class="corner-note tr">On-device<br>Nothing uploaded</span>
@@ -96,7 +97,13 @@
   <div id="boot" class="float bootlog" aria-hidden="true"></div>
 
   <aside id="inspector" class="float console" aria-label="Controls">
-    <div class="console-head"><span id="console-title">Control // 01</span><span class="hatch"></span><span id="console-state"><span class="sq ok"></span> idle</span></div>
+    <div class="console-head">
+      <span id="console-title">Control</span>
+      <div class="headseg" id="mode-head" role="radiogroup" aria-label="Mode · 模式"></div>
+      <span class="hatch"></span>
+      <span id="console-state"><span class="sq ok"></span> idle</span>
+      <button id="console-toggle" class="sheet-toggle" title="Collapse / expand · 收起 / 展開" aria-label="Collapse or expand the controls"><i>⌄</i></button>
+    </div>
     <div id="panel" class="console-body"></div>
   </aside>
   <button id="console-bookmark" class="float bookmark left" title="Collapse the console · 收起"><i>‹</i></button>
@@ -156,11 +163,12 @@
     <div class="body">
       <h2>Settings<small>偏好設定</small></h2>
       <div class="setting"><div class="lab">Theme<small>明暗主題</small></div><div class="seg" id="theme-seg"></div></div>
-      <div class="setting"><div class="lab">Mode<small>簡單模式只保留核心功能；科研模式開放全部參數與分析工具</small></div><div class="seg" id="mode-seg"></div></div>
+      <div class="setting"><div class="lab">Mode<small>簡單模式只保留核心功能；科研模式開放全部參數與分析工具（也可在控制台標題列切換）</small></div><div class="seg" id="mode-seg"></div></div>
       <div class="setting"><div class="lab">Fit animation<small>擬合動畫：傳輸網格、矢量視角、掃描線；關閉後直接顯示即時渲染</small></div><label class="switch" style="margin:0"><input type="checkbox" id="anim-toggle"><span class="tg"></span></label></div>
       <div class="setting"><div class="lab">Starlight<small>星光：背景中漂浮的主題色光點</small></div><label class="switch" style="margin:0"><input type="checkbox" id="stars-toggle"><span class="tg"></span></label></div>
       <div class="setting"><div class="lab">Motion<small>動效：圓環旋轉、背景、掃描線等裝飾動畫</small></div><label class="switch" style="margin:0"><input type="checkbox" id="motion-toggle"><span class="tg"></span></label></div>
-      <div class="modal-foot"><span>OTSR 0.1.2 · MIT · runs on your GPU</span><a href="docs/index.md" target="_blank">Documentation · 文件 ↗</a></div>
+      <div class="setting"><div class="lab">GPU<small>此頁使用的 WebGPU 介面卡</small></div><div class="val" id="settings-gpu">—</div></div>
+      <div class="modal-foot"><span>OTSR 0.1.3 · MIT · runs on your GPU</span><span class="links"><a href="report.html" target="_blank" rel="noopener">Technical report · 技術報告 ↗</a><a href="docs/index.md" target="_blank">Documentation · 文件 ↗</a></span></div>
     </div>
   </dialog>
 

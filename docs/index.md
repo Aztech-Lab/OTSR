@@ -12,4 +12,5 @@
 | [performance.md](performance.md) | everyone | measured timings, memory model, how to benchmark |
 | [tutorial-porting.md](tutorial-porting.md) | developers | how the research code was ported step by step: derivations, decisions, mistakes, checklist |
 
-The top-level [README](../README.md) gives the overview.
+The top-level [README](../README.md) gives the overview; the technical report (`report.html` in the app) tells the
+method, the engine and the research process on one page.

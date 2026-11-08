@@ -1,6 +1,6 @@
-// The console (left): the mode switch, numbered sections — source, preset, output, and in research mode view /
-// region / session — and the process log of the running / last job. Every control carries an English and a
-// Traditional Chinese label. The fit button floats over the image (main.ts).
+// The console (left): numbered sections — source, preset, output, and in research mode view / region / session —
+// and the process log of the running / last job. Every control carries an English and a Traditional Chinese label.
+// The mode switch sits in the console's title bar and the fit button floats over the image (both in main.ts).
 
 import { EDGE_PX } from '../core/spec';
 import type { Actions, SampleEntry } from './actions';
@@ -32,6 +32,9 @@ const LOSS_TEXT: [Loss, string, string][] = [
 const SCALES = [1, 2, 4, 8, 16];
 const PROGRESS_CELLS = 24;
 const LOG_LINES = 8;
+/** State keys the console never shows: a change of these alone (every pan and zoom frame) does not refresh it — except
+ * the zoom while the Gaussian-outline note of research mode is up, which reports what is in view. */
+const IGNORED_KEYS: ReadonlySet<keyof AppState> = new Set<keyof AppState>(['zoom', 'status', 'monitor', 'regions']);
 /** Pixel counts for the scale buttons: 2048, 8192, 16.4k. */
 const px = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
 
@@ -43,7 +46,7 @@ export class Panel {
   constructor(readonly root: HTMLElement, readonly store: Store, readonly actions: Actions, readonly viewer: Viewer) {
     store.subscribe((s, changed) => {
       if (s.prefs.mode !== this.builtMode) this.build(s.prefs.mode);
-      else if (changed.size) for (const r of this.refreshers) r(s);
+      else if ([...changed].some((k) => !IGNORED_KEYS.has(k)) || (changed.has('zoom') && s.layers.gaussians && this.builtMode === 'research')) for (const r of this.refreshers) r(s);
     });
     void actions.sampleList().then((list) => {
       this.samples = list;
@@ -67,12 +70,6 @@ export class Panel {
       const v = h('div', { class: 'v' }, '—');
       return [h('div', { class: 'readout' }, key, v), v, key] as const;
     };
-
-    // ---- mode ---------------------------------------------------------------------------------------------------
-    const modeBtn = (m: Mode, en: string, zh: string) => h('button', { class: `on-${m}`, onClick: () => s.setPrefs({ mode: m }) }, h('b', null, en), h('small', null, zh));
-    const modebar = h('div', { class: 'modebar' }, h('span', { class: 'micro' }, 'Mode · 模式'),
-      h('div', { class: 'seg solidseg', role: 'radiogroup' }, modeBtn('simple', 'Simple', '簡單'), modeBtn('research', 'Research', '科研')));
-    this.refreshers.push((st) => { modebar.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.classList.contains(`on-${st.prefs.mode}`))); });
 
     // ---- 01 source --------------------------------------------------------------------------------------------
     const fileInput = h('input', { type: 'file', accept: 'image/*,.otsr', hidden: true, onChange: () => { const f = fileInput.files?.[0]; if (f) void a.openAny(f); fileInput.value = ''; } });
@@ -161,13 +158,14 @@ export class Panel {
     const loadInput = h('input', { type: 'file', accept: '.otsr', hidden: true, onChange: () => { const f = loadInput.files?.[0]; if (f) void a.openModelFile(f); loadInput.value = ''; } });
     const output = section('Output', '輸出', scales, customScale, exportWrap,
       h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, bi('Load model', '載入模型'), h('span', { class: 'arrow' }, '↗')), loadInput));
+    let labelled: ExportFormat | null = null;
     this.refreshers.push((st) => {
       const base = st.model ?? st.image;
       scales.querySelectorAll('button').forEach((b, i) => {
         if (i < SCALES.length) b.querySelector('small')!.textContent = base ? `${px(base.W * SCALES[i])}×${px(base.H * SCALES[i])}` : '';
       });
       const f = EXPORT_FORMATS.find((x) => x.key === (st.prefs.exportFormat ?? 'png')) ?? EXPORT_FORMATS[0];
-      exportLabel.replaceChildren(...bi(`Export ${f.label}`, `匯出 ${f.label}`).childNodes);
+      if (labelled !== f.key) { labelled = f.key; exportLabel.replaceChildren(...bi(`Export ${f.label}`, `匯出 ${f.label}`).childNodes); }
       quality.hidden = !f.lossy;
       exportBtn.disabled = !st.model || !!st.job;
       menuBtn.disabled = !!st.job;
@@ -265,12 +263,12 @@ export class Panel {
       log.replaceChildren(...lines.map((l) => h('div', { title: l }, l)));
       if (st.lastFit && !busy) {
         const f = st.lastFit;
-        done.replaceChildren(h('span', { class: 'note', style: 'margin:0' }, `${fmtInt(f.count)} g · ${fmtInt(f.steps)} steps · ${fmtSeconds(f.seconds)}`), h('span', { class: 'tag' }, f.cancelled ? 'Stopped · 已停止' : 'Complete · 完成'));
+        done.replaceChildren(h('span', { class: 'note', style: 'margin:0' }, h('b', null, `${f.psnr.toFixed(2)} dB`), ` · ${fmtInt(f.count)} g · ${fmtInt(f.steps)} steps · ${fmtSeconds(f.seconds)}`), h('span', { class: 'tag' }, f.cancelled ? 'Stopped · 已停止' : 'Complete · 完成'));
         done.hidden = false;
       } else done.hidden = true;
     });
 
-    this.root.replaceChildren(modebar, ...sections, run);
+    this.root.replaceChildren(...sections, run);
     for (const r of this.refreshers) r(s.state);
   }
 

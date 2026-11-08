@@ -9,7 +9,7 @@ import { findBrowser, webgpuArgs } from './browser.mjs';
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const DIST = path.join(ROOT, 'dist');
 const OUT = path.join(ROOT, 'tools', 'out');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.map': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.md': 'text/markdown' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.map': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.md': 'text/markdown' };
 if (!fs.existsSync(path.join(DIST, 'index.html'))) throw new Error('dist/index.html missing: run npm run build first');
 fs.mkdirSync(OUT, { recursive: true });
 

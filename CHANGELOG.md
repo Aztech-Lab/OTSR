@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.3 — 2026-11-08
+
+Phones, a technical report, a tighter console, less work per frame.
+
+- **Phones and small tablets** (below 960 px) have a layout of their own: the console is a sheet at the bottom that
+  folds to its title bar — it folds when an image arrives and while a fit runs, and opens on the result and the export
+  controls — the zoom bar sits on the sheet and the action stays at the top; held sideways, the console is a column on
+  the left that closes to a tab on the edge. Two fingers pinch-zoom the image; the page itself never zooms. No blur
+  over the canvas, fewer stars and a slower animation cadence on phones; notices float above the zoom bar; the
+  settings dialog scrolls; icon-only system buttons; "Choose image" instead of "Drop image" on touch screens.
+  `npm run smoke:mobile` checks three touch viewports against these rules.
+- **Technical report** (`report.html`): the method, the engine and the research process on one page, with diagrams
+  and the validation figures, in the app's design and theme — from the start screen, the chip next to the version
+  badge, and the settings.
+- **Console**: the Simple / Research switch sits in the title bar (no mode row); the panel keeps its width whatever
+  the file name (ellipsis; the Replace button stays put; no sideways scrolling); the result line shows the PSNR; the
+  console is narrower on windows under 1280 px. The image is placed from the measured panels, and a fitted image
+  stays fitted when a panel opens or closes or the window changes.
+- **Less overhead**: the console no longer re-renders on every pan and zoom frame; the tile-entry check after a render
+  is one read-back in flight at a time and at most every 120 ms while the view only moves; the monitor's crops are
+  skipped when the panel is not shown; canvas resizes are coalesced; the export label is rebuilt only when the format
+  changes; the unused icon set is gone. The design tokens live in `src/tokens.css`, shared by the app and the report.
+- One sample image needs no selector; the settings show the GPU in use.
+
 ## 0.1.2 — 2026-11-08
 
 The extras and the vector view.

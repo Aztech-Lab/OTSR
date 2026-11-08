@@ -30,7 +30,8 @@ npm run serve        # or: npm run dev for a live-reload development server
 
 ## Two modes
 
-The switch in the header picks the mode; the choice and every setting are remembered in the browser.
+The switch in the console's title bar (Simple · Research) picks the mode; the choice and every setting are remembered
+in the browser.
 
 **Simple** — the three steps of the product and nothing else:
 
@@ -93,6 +94,19 @@ fit animation and all decorative motion off.
 
 Research mode gains more tools over time (comparison figures of the region across methods, error maps, the Gaussian
 structure view, fit curves); the CHANGELOG lists what is in.
+
+## On a phone or a small tablet
+
+Below 960 px the layout changes. The console is a sheet at the bottom of the screen: tap its title bar (the chevron)
+to open or fold it. It folds by itself when an image arrives and while a fit runs — the picture is the point then —
+and opens afterwards on the result and the export controls. The action stays at the top, the zoom bar sits on the
+sheet. Pinch with two fingers to zoom, drag to pan, double-tap to fit the image. Held sideways, the console is a
+column on the left that closes to a tab on the edge. The monitor panel, the pixel rulers' readout and the status strip
+are not shown on phones; notices appear above the zoom bar. Fits run on the phone's own GPU and take correspondingly
+longer: start with the *Fast* preset.
+
+The **technical report** (`report.html`, from the start screen, the chip next to the version badge or the settings)
+explains the method, the engine and the research process on one page.
 
 ## Keyboard shortcuts
 

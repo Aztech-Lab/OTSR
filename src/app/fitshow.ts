@@ -20,6 +20,7 @@ const PAINT_MIN_MS = 1800; // the recoloured Gaussians are shown at least this l
 const MESH_FADE_MS = 900;
 const REVEAL_MS = 1300;
 const RENDER_INTERVAL_MS = 40; // live render cadence in phase 2 (the optimiser keeps running meanwhile)
+const RENDER_INTERVAL_COMPACT_MS = 90; // on phones the fit itself needs the GPU more
 const MAX_NODES = 110; // mesh nodes per axis (subsampled)
 const FLICKER_MS = 90;
 const FX_BYTES = 32;
@@ -238,8 +239,9 @@ export class FitShow {
       const now = performance.now();
       this.advance(now);
       if (this.active) {
+        const interval = matchMedia('(max-width: 960px)').matches ? RENDER_INTERVAL_COMPACT_MS : RENDER_INTERVAL_MS;
         if (this.phase === 'lattice') this.viewer.refreshOverlay();
-        else if (now - this.lastRender >= RENDER_INTERVAL_MS) { this.lastRender = now; this.viewer.requestRender(); }
+        else if (now - this.lastRender >= interval) { this.lastRender = now; this.viewer.requestRender(); }
         else this.viewer.refreshOverlay();
         this.loop();
       }

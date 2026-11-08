@@ -164,6 +164,7 @@ export class Monitor {
   /** Re-renders the crop of every region (one at a time; a request during a render runs once more afterwards). */
   async renderCrops(): Promise<void> {
     if (this.rendering) { this.pendingRender = true; return; }
+    if (!this.host.getClientRects().length) return; // the panel is not shown (phone layout): no crops to draw
     this.rendering = true;
     try {
       const regions = this.store.state.regions;
