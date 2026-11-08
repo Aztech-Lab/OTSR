@@ -338,7 +338,9 @@ select option { background: var(--bg); }
 .exportwrap { position: relative; margin-top: 12px; }
 .splitbtn { display: flex; gap: 2px; }
 .splitbtn .btn.big { flex: 1; clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
-.splitbtn .btn.menu { width: 44px; height: 52px; padding: 0; justify-content: center; font: 400 16px/1 var(--mono); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+.splitbtn .btn.big { justify-content: flex-start; }
+.splitbtn .btn.menu { height: 52px; padding: 0 12px 0 14px; gap: 10px; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+.splitbtn .btn.menu .arrow { font-size: 12px; opacity: 0.8; }
 .exportmenu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 6; padding: 12px 14px 14px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); }
 .exportmenu .range { margin-top: 12px; }
 

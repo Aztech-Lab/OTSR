@@ -142,9 +142,9 @@ export class Panel {
     customScale.hidden = SCALES.includes(s.state.prefs.scale);
     // the export control: the button exports in the chosen format, the arrow opens the format menu
     const exportLabel = h('span', { class: 'bi' });
-    const exportBtn = h('button', { class: 'btn solid big', onClick: () => void a.exportImage() }, exportLabel, h('span', { class: 'arrow' }, '↓'));
+    const exportBtn = h('button', { class: 'btn solid big', onClick: () => void a.exportImage() }, exportLabel);
     const exportMenu = h('div', { class: 'exportmenu', hidden: true });
-    const menuBtn = h('button', { class: 'btn solid menu', title: 'Export format · 匯出格式', onClick: () => { exportMenu.hidden = !exportMenu.hidden; } }, '▾');
+    const menuBtn = h('button', { class: 'btn solid menu', title: 'Export format · 匯出格式', onClick: () => { exportMenu.hidden = !exportMenu.hidden; } }, bi('Format', '格式'), h('span', { class: 'arrow' }, '▾'));
     const formats = this.choices(EXPORT_FORMATS.map((f) => [f.key, f.label, f.lossy ? 'lossy' : 'lossless'] as const), (st) => st.prefs.exportFormat ?? 'png', (k) => s.setPrefs({ exportFormat: k }), 'tight');
     const quality = this.rangeField('Quality', '品質', 'exportQuality', 0.5, 1, 0.01, '', (v) => s.setPrefs({ exportQuality: v }));
     exportMenu.append(h('div', { class: 'micro', style: 'margin-bottom:8px' }, 'Format · 格式'), formats, quality);
