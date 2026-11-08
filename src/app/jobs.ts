@@ -28,8 +28,12 @@ export class JobRunner {
       return undefined;
     }
     const controller = new AbortController();
-    const progress = (fraction: number, text: string) => this.store.set({ job: { name, fraction, text, cancel: () => controller.abort() } });
-    progress(-1, 'Starting …');
+    const progress = (fraction: number, text: string) => {
+      const log = this.store.state.log;
+      this.store.set({ job: { name, fraction, text, cancel: () => controller.abort() }, log: text && text !== log[log.length - 1] ? [...log.slice(-7), text] : log });
+    };
+    this.store.set({ log: [] });
+    progress(-1, `${name} started`);
     try {
       return await fn({ signal: controller.signal, progress });
     } catch (e) {

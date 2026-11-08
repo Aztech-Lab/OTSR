@@ -42,6 +42,10 @@ export class Viewer {
   compareWith: ResampleMode = 'bicubic';
   /** Divider position as a fraction of the canvas width. */
   splitFrac = 0.5;
+  /** Colour around the image (linear 0..1 RGB of the stage background); follows the page theme. */
+  background: [number, number, number] = [0.043, 0.067, 0.078];
+  /** Space kept clear of floating UI when fitting the image (CSS px). */
+  insets = { left: 16, top: 16, right: 16, bottom: 16 };
   /** Output (device) pixels per source pixel. */
   zoom = 1;
   offsetX = 0;
@@ -151,13 +155,22 @@ export class Viewer {
 
   // ---- navigation ----------------------------------------------------------------------------------------------
 
+  /** The free area between the insets, in device pixels: [x0, y0, width, height]. */
+  private freeArea(): [number, number, number, number] {
+    const d = this.dpr;
+    const i = this.insets;
+    const w = Math.max(64 * d, this.width - (i.left + i.right) * d);
+    const h = Math.max(64 * d, this.height - (i.top + i.bottom) * d);
+    return [i.left * d, i.top * d, w, h];
+  }
+
   fitToView(): void {
     const s = this.sourceSize;
     if (!s || !this.width) return;
-    const pad = 16 * this.dpr;
-    this.zoom = Math.max(MIN_ZOOM, Math.min((this.width - 2 * pad) / s.W, (this.height - 2 * pad) / s.H));
-    this.offsetX = (this.width - s.W * this.zoom) / 2;
-    this.offsetY = (this.height - s.H * this.zoom) / 2;
+    const [x0, y0, w, h] = this.freeArea();
+    this.zoom = Math.max(MIN_ZOOM, Math.min(w / s.W, h / s.H));
+    this.offsetX = x0 + (w - s.W * this.zoom) / 2;
+    this.offsetY = y0 + (h - s.H * this.zoom) / 2;
     this.changed();
   }
 
@@ -179,11 +192,11 @@ export class Viewer {
   /** Zooms so that the region fills the view. */
   zoomToRoi(roi: Roi): void {
     if (!this.width) return;
-    const pad = 24 * this.dpr;
-    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min((this.width - 2 * pad) / roi.w, (this.height - 2 * pad) / roi.h)));
+    const [x0, y0, w, h] = this.freeArea();
+    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(w / roi.w, h / roi.h)));
     this.zoom = z;
-    this.offsetX = (this.width - roi.w * z) / 2 - roi.x * z;
-    this.offsetY = (this.height - roi.h * z) / 2 - roi.y * z;
+    this.offsetX = x0 + (w - roi.w * z) / 2 - roi.x * z;
+    this.offsetY = y0 + (h - roi.h * z) / 2 - roi.y * z;
     this.changed();
   }
 
@@ -261,7 +274,14 @@ export class Viewer {
 
   private renderTo(target: GPUTextureView): void {
     const s = this.sourceSize;
-    if (!s || !this.bufA || !this.bufB) return;
+    if (!this.bufA || !this.bufB) return;
+    if (!s) {
+      // nothing loaded yet: clear to the stage colour
+      const enc = this.device.createCommandEncoder({ label: 'viewer.clear' });
+      this.presenter.encode(enc, this.bufA, 0, 0, target, { background: this.background });
+      this.device.queue.submit([enc.finish()]);
+      return;
+    }
     const view: ViewParams = { srcW: s.W, srcH: s.H, zoom: this.zoom, offsetX: this.offsetX, offsetY: this.offsetY, aa: 0, outW: this.width, outH: this.height };
     const enc = this.device.createCommandEncoder({ label: 'viewer' });
     const modelMode = this.mode === 'otsr' || this.mode === 'raw';
@@ -290,7 +310,7 @@ export class Viewer {
       this.resampler.encode(enc, this.source.rgba, this.bufA, view, mode);
       main = this.bufA;
     } else {
-      this.presenter.encode(enc, this.bufA, 0, 0, target);
+      this.presenter.encode(enc, this.bufA, 0, 0, target, { background: this.background });
       this.device.queue.submit([enc.finish()]);
       return;
     }
@@ -299,7 +319,7 @@ export class Viewer {
       this.resampler.encode(enc, this.source.rgba, this.bufB, { ...view, aa: 0 }, this.compareWith);
       compare = { img: this.bufB, split: this.splitFrac * this.width };
     }
-    this.presenter.encode(enc, main, this.width, this.height, target, { rect: this.imageRect(s), compare });
+    this.presenter.encode(enc, main, this.width, this.height, target, { rect: this.imageRect(s), compare, background: this.background });
     this.device.queue.submit([enc.finish()]);
   }
 
@@ -312,42 +332,49 @@ export class Viewer {
     if (this.splitVisible) {
       const x = Math.round(this.splitFrac * this.width);
       g.save();
+      g.shadowColor = 'rgba(0,0,0,0.25)';
+      g.shadowBlur = 6 * dpr;
       g.lineWidth = 2 * dpr;
-      g.strokeStyle = 'rgba(0,0,0,0.5)';
-      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, this.height); g.stroke();
-      g.lineWidth = 1 * dpr;
       g.strokeStyle = '#fff';
       g.beginPath(); g.moveTo(x, 0); g.lineTo(x, this.height); g.stroke();
-      // handle
-      const r = 14 * dpr;
+      // handle: a square plate with two chevrons
+      const r = 16 * dpr;
       const cy = this.height / 2;
-      g.fillStyle = 'rgba(20,20,24,0.85)';
-      g.beginPath(); g.arc(x, cy, r, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = '#fff'; g.lineWidth = 1.5 * dpr; g.stroke();
+      g.fillStyle = 'rgba(237,235,228,0.96)';
+      g.fillRect(x - r, cy - r, 2 * r, 2 * r);
+      g.shadowBlur = 0;
+      g.strokeStyle = '#252820';
+      g.lineWidth = 1.6 * dpr;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
       g.beginPath();
-      g.moveTo(x - 6 * dpr, cy); g.lineTo(x - 2 * dpr, cy - 4 * dpr); g.lineTo(x - 2 * dpr, cy + 4 * dpr); g.closePath();
-      g.moveTo(x + 6 * dpr, cy); g.lineTo(x + 2 * dpr, cy - 4 * dpr); g.lineTo(x + 2 * dpr, cy + 4 * dpr); g.closePath();
-      g.fillStyle = '#fff'; g.fill();
-      // labels
+      g.moveTo(x - 3 * dpr, cy - 5 * dpr); g.lineTo(x - 8 * dpr, cy); g.lineTo(x - 3 * dpr, cy + 5 * dpr);
+      g.moveTo(x + 3 * dpr, cy - 5 * dpr); g.lineTo(x + 8 * dpr, cy); g.lineTo(x + 3 * dpr, cy + 5 * dpr);
+      g.stroke();
+      // labels below the top bar
       const labelL = this.compareWith.charAt(0).toUpperCase() + this.compareWith.slice(1);
       const labelR = this.mode === 'raw' ? 'Gaussians' : 'OTSR';
-      this.label(g, labelL, x - 8 * dpr, 12 * dpr, 'right', dpr);
-      this.label(g, labelR, x + 8 * dpr, 12 * dpr, 'left', dpr);
+      const ly = (this.insets.top + 4) * dpr;
+      this.label(g, labelL, x - 10 * dpr, ly, 'right', dpr);
+      this.label(g, labelR, x + 10 * dpr, ly, 'left', dpr);
       g.restore();
     }
     this.roi.draw(g, t, this.tool === 'roi', dpr);
   }
 
   private label(g: CanvasRenderingContext2D, text: string, x: number, y: number, align: 'left' | 'right', dpr: number): void {
-    g.font = `600 ${12 * dpr}px system-ui, sans-serif`;
-    const w = g.measureText(text).width + 12 * dpr;
+    g.font = `600 ${10.5 * dpr}px system-ui, sans-serif`;
+    if ('letterSpacing' in g) (g as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${1.2 * dpr}px`;
+    const label = text.toUpperCase();
+    const w = g.measureText(label).width + 22 * dpr;
     const x0 = align === 'left' ? x : x - w;
-    g.fillStyle = 'rgba(0,0,0,0.6)';
-    g.beginPath();
-    g.roundRect(x0, y, w, 20 * dpr, 4 * dpr);
-    g.fill();
-    g.fillStyle = '#fff';
-    g.fillText(text, x0 + 6 * dpr, y + 14 * dpr);
+    g.shadowColor = 'rgba(99,81,58,0.18)';
+    g.shadowBlur = 10 * dpr;
+    g.fillStyle = 'rgba(237,235,228,0.94)';
+    g.fillRect(x0, y, w, 24 * dpr);
+    g.shadowBlur = 0;
+    g.fillStyle = '#080a08';
+    g.fillText(label, x0 + 11 * dpr, y + 16 * dpr);
   }
 
   // ---- input ---------------------------------------------------------------------------------------------------

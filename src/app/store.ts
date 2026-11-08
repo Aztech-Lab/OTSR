@@ -21,6 +21,7 @@ export interface Prefs {
   compare: CompareMode;
   compareWith: 'bicubic' | 'bilinear' | 'nearest';
   theme: Theme;
+  motion: boolean;
   /** Measured Gaussian-steps per second of this machine, for time estimates (0 = unknown). */
   throughput: number;
   sections: Record<string, boolean>;
@@ -67,6 +68,8 @@ export interface AppState {
   viewMode: ViewMode;
   zoom: number;
   status: { text: string; error: boolean };
+  /** Last progress lines of the running / finished job (newest last). */
+  log: string[];
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -79,7 +82,8 @@ export const DEFAULT_PREFS: Prefs = {
   scale: 4,
   compare: 'split',
   compareWith: 'bicubic',
-  theme: 'auto',
+  theme: 'light',
+  motion: true,
   throughput: 0,
   sections: {},
 };
@@ -118,6 +122,7 @@ export class Store {
       viewMode: 'bicubic',
       zoom: 1,
       status: { text: '', error: false },
+      log: [],
     };
   }
 
