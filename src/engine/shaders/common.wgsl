@@ -22,7 +22,8 @@ struct View {
   tiles: vec2<u32>,
   count: u32,            // number of Gaussians
   entry_cap: u32,        // capacity of the tile-entry arrays
-  _pad: vec2<u32>,
+  loss_kind: u32,        // 0: squared error (the reference), 1: Charbonnier |d| with eps 1e-3 (research option)
+  _pad: u32,
 };
 
 // Linear invocation index for 1-D work laid out as a 2-D dispatch of `size`-wide workgroups (dispatch1d in util.ts).

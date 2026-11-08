@@ -42,7 +42,11 @@ fn backward(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_ind
   if (pix.x < view.out_size.x && pix.y < view.out_size.y) {
     let idx = pix.y * view.out_size.x + pix.x;
     let o = out[idx];
-    let G = 2.0 * (o.xyz - gt[idx].xyz) * view.grad_scale;
+    let d = o.xyz - gt[idx].xyz;
+    var G = 2.0 * d * view.grad_scale;
+    if (view.loss_kind == 1u) {
+      G = d / sqrt(d * d + vec3<f32>(1e-6)) * view.grad_scale;
+    }
     pg[li] = vec4<f32>(G / o.w, 0.0);
     po[li] = vec4<f32>(o.xyz, 0.0);
   } else {

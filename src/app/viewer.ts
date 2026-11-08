@@ -2,7 +2,7 @@
 // over the source image resampled with a classic filter; a split comparison between the two; a 2-D overlay for the
 // split handle, labels and the region-of-interest tool.
 
-import { EDGE_PX } from '../core/spec';
+import { EDGE_PX, OFFSET } from '../core/spec';
 import { EdgePass, Presenter, Rasterizer, Resampler, createBuffer, type GpuContext, type Pipelines, type ResampleMode, type ViewParams } from '../engine';
 import { encodePng } from './image';
 import { RoiTool, type Roi, type RoiTransform } from './roi';
@@ -15,6 +15,15 @@ export interface ViewerModel {
   W: number;
   H: number;
   params: GPUBuffer;
+  /** CPU copy of the parameters when available (the Gaussian outline layer reads it). */
+  cpu?: Float32Array | null;
+}
+
+export interface ViewerLayers {
+  /** 1-sigma outlines of the Gaussians in their own colour (research). */
+  gaussians: boolean;
+  /** The |error| map of the fit over the image (research). */
+  error: boolean;
 }
 
 export interface ViewerSource {
@@ -27,11 +36,28 @@ export interface ViewerEvents {
   onViewChange?: (zoom: number) => void;
   onRoiChange?: (roi: Roi | null, final: boolean) => void;
   onToolChange?: (tool: Tool) => void;
+  /** Pointer position in source pixels, or null when it leaves the image. */
+  onHover?: (sx: number | null, sy: number | null) => void;
 }
 
 const MIN_ZOOM = 1 / 32;
 const MAX_ZOOM = 64;
 const SPLIT_GRAB_PX = 10;
+/** Gaussian outlines are drawn from this zoom on (below it they are sub-pixel) and up to this many per frame. */
+const OUTLINE_MIN_ZOOM = 2;
+const OUTLINE_MAX = 60000;
+
+function cssVar(name: string, fallback: string): string {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+/** Major ruler spacing in source pixels so that ticks are at least `minPx` device pixels apart. */
+function rulerStep(zoom: number, minPx: number): number {
+  const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  for (const s of steps) if (s * zoom >= minPx) return s;
+  return 10000;
+}
 
 export class Viewer {
   mode: ViewMode = 'bicubic';
@@ -46,6 +72,17 @@ export class Viewer {
   background: [number, number, number] = [0.043, 0.067, 0.078];
   /** Space kept clear of floating UI when fitting the image (CSS px). */
   insets = { left: 16, top: 16, right: 16, bottom: 16 };
+  /** Pixel rulers along the top and left edge of the image. */
+  rulers = true;
+  /** While set, the canvas shows only the background (the fit animation draws on the overlay instead). */
+  curtain = false;
+  /** Replaces the overlay layers while set (the fit animation); the region markers are drawn on top of it. */
+  painter: ((g: CanvasRenderingContext2D, t: RoiTransform, dpr: number) => void) | null = null;
+  /** Labelled boxes in source pixels (the monitor's active regions). */
+  markers: { x: number; y: number; w: number; h: number; label: string; score: number }[] = [];
+  layers: ViewerLayers = { gaussians: false, error: false };
+  /** Outline layer statistics of the last overlay draw: Gaussians inside the view and how many were drawn. */
+  outlineInfo = { visible: 0, drawn: 0, tooFar: false };
   /** Output (device) pixels per source pixel. */
   zoom = 1;
   offsetX = 0;
@@ -72,6 +109,9 @@ export class Viewer {
   private lastX = 0;
   private lastY = 0;
   private holdMode: ViewMode | null = null;
+  private errorMap: ImageBitmap | null = null;
+  private sweep: number | null = null;
+  private hoverOn = false;
   private readonly dpr = window.devicePixelRatio || 1;
 
   constructor(readonly canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, readonly ctx: GpuContext, readonly pipes: Pipelines) {
@@ -131,6 +171,48 @@ export class Viewer {
   setSource(source: ViewerSource | null): void {
     this.source = source;
     this.changed();
+  }
+
+  /** The |error| image of the fit (source size), drawn by the error layer; null clears it. */
+  setErrorMap(map: ImageBitmap | null): void {
+    this.errorMap?.close();
+    this.errorMap = map;
+    this.drawOverlay();
+  }
+
+  get hasErrorMap(): boolean {
+    return this.errorMap !== null;
+  }
+
+  /** Redraws the 2-D overlay only (layers, rulers, region). */
+  refreshOverlay(): void {
+    this.drawOverlay();
+  }
+
+  /** Runs the divider once across the visible image and back to its middle (after a fit; motion only). */
+  sweepSplit(ms = 1500): void {
+    const s = this.sourceSize;
+    if (!this.splitVisible || !s) return;
+    if (this.sweep !== null) cancelAnimationFrame(this.sweep);
+    const d = this.dpr;
+    const [ix0, , ix1] = this.imageRect(s);
+    const a = Math.max(this.insets.left * d, ix0, 0) / this.width;
+    const b = Math.min(this.width - this.insets.right * d, ix1, this.width) / this.width;
+    if (b - a < 0.05) return;
+    const from = this.splitFrac;
+    const t0 = performance.now();
+    const ease = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * x);
+    const frame = () => {
+      const u = Math.min(1, (performance.now() - t0) / ms);
+      // from -> left edge -> right edge -> middle of the visible image
+      const k = [from, a + 0.02, b - 0.02, (a + b) / 2];
+      const seg = Math.min(2, Math.floor(u * 3));
+      const f = ease(u * 3 - seg);
+      this.splitFrac = k[seg] + (k[seg + 1] - k[seg]) * f;
+      this.requestRender();
+      this.sweep = u < 1 ? requestAnimationFrame(frame) : null;
+    };
+    this.sweep = requestAnimationFrame(frame);
   }
 
   /** The transform between source pixels and canvas device pixels. */
@@ -275,7 +357,7 @@ export class Viewer {
   private renderTo(target: GPUTextureView): void {
     const s = this.sourceSize;
     if (!this.bufA || !this.bufB) return;
-    if (!s) {
+    if (!s || this.curtain) {
       // nothing loaded yet: clear to the stage colour
       const enc = this.device.createCommandEncoder({ label: 'viewer.clear' });
       this.presenter.encode(enc, this.bufA, 0, 0, target, { background: this.background });
@@ -329,6 +411,20 @@ export class Viewer {
     g.clearRect(0, 0, this.width, this.height);
     const t = this.transform();
     if (!t) return;
+    if (this.painter) {
+      this.painter(g, t, dpr);
+      this.drawMarkers(g, dpr);
+      return;
+    }
+    const [x0, y0, x1, y1] = this.imageRect(t);
+    if (this.layers.error && this.errorMap) {
+      g.save();
+      g.imageSmoothingEnabled = this.zoom < 1;
+      g.drawImage(this.errorMap, x0, y0, x1 - x0, y1 - y0);
+      g.restore();
+    }
+    if (this.rulers) this.drawRulers(g, t, dpr);
+    if (this.layers.gaussians) this.drawOutlines(g, t, dpr);
     if (this.splitVisible) {
       const x = Math.round(this.splitFrac * this.width);
       g.save();
@@ -351,15 +447,139 @@ export class Viewer {
       g.moveTo(x - 3 * dpr, cy - 5 * dpr); g.lineTo(x - 8 * dpr, cy); g.lineTo(x - 3 * dpr, cy + 5 * dpr);
       g.moveTo(x + 3 * dpr, cy - 5 * dpr); g.lineTo(x + 8 * dpr, cy); g.lineTo(x + 3 * dpr, cy + 5 * dpr);
       g.stroke();
-      // labels below the top bar
+      // labels just below the command block
       const labelL = this.compareWith.charAt(0).toUpperCase() + this.compareWith.slice(1);
       const labelR = this.mode === 'raw' ? 'Gaussians' : 'OTSR';
-      const ly = (this.insets.top + 4) * dpr;
+      const ly = (this.insets.top + 12) * dpr;
       this.label(g, labelL, x - 10 * dpr, ly, 'right', dpr);
       this.label(g, labelR, x + 10 * dpr, ly, 'left', dpr);
       g.restore();
     }
     this.roi.draw(g, t, this.tool === 'roi', dpr);
+    this.drawMarkers(g, dpr);
+  }
+
+  /** The monitor's active regions: thin boxes with a letter, brighter for the more active ones. */
+  private drawMarkers(g: CanvasRenderingContext2D, dpr: number): void {
+    if (!this.markers.length) return;
+    const z = this.zoom;
+    g.save();
+    g.font = `700 ${10 * dpr}px ui-monospace, Consolas, monospace`;
+    g.textBaseline = 'top';
+    const col = cssVar('--copper-2', '#d9a25f');
+    for (const m of this.markers) {
+      const x = this.offsetX + m.x * z, y = this.offsetY + m.y * z, w = m.w * z, hh = m.h * z;
+      if (x + w < 0 || y + hh < 0 || x > this.width || y > this.height) continue;
+      g.globalAlpha = 0.45 + 0.55 * m.score;
+      g.strokeStyle = col;
+      g.lineWidth = 1.5 * dpr;
+      g.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(w), Math.round(hh));
+      g.fillStyle = col;
+      g.fillRect(x, y - 15 * dpr, 16 * dpr, 15 * dpr);
+      g.fillStyle = '#111312';
+      g.fillText(m.label, x + 4 * dpr, y - 13 * dpr);
+    }
+    g.restore();
+  }
+
+  /** Tick rulers in source pixels along the top and the left edge of the image (outside it). */
+  private drawRulers(g: CanvasRenderingContext2D, t: RoiTransform, dpr: number): void {
+    const [x0, y0, x1, y1] = this.imageRect(t);
+    const z = this.zoom;
+    const major = rulerStep(z, 72 * dpr);
+    const minor = major / (major % 5 === 0 && major >= 5 ? 5 : 2);
+    const len = 7 * dpr;
+    const gap = 8 * dpr; // distance from the image edge (the frame brackets sit there)
+    const top = y0 - gap;
+    const left = x0 - gap;
+    const drawTop = top > this.insets.top * dpr * 0.8 && top < this.height - this.insets.bottom * dpr;
+    const drawLeft = left > this.insets.left * dpr && left < this.width - this.insets.right * dpr;
+    if (!drawTop && !drawLeft) return;
+    g.save();
+    g.strokeStyle = cssVar('--faint', '#a3a59d');
+    g.fillStyle = cssVar('--muted', '#6f726a');
+    g.lineWidth = 1 * dpr;
+    g.font = `500 ${8.5 * dpr}px ui-monospace, Consolas, monospace`;
+    g.textBaseline = 'alphabetic';
+    g.beginPath();
+    const sx0 = Math.max(0, Math.floor((0 - x0) / z / minor) * minor);
+    const sx1 = Math.min(t.W, (this.width - x0) / z);
+    const sy0 = Math.max(0, Math.floor((0 - y0) / z / minor) * minor);
+    const sy1 = Math.min(t.H, (this.height - y0) / z);
+    const isMajor = (s: number) => Math.abs(s / major - Math.round(s / major)) < 1e-6;
+    if (drawTop) {
+      g.moveTo(Math.max(0, x0), top + 0.5); g.lineTo(Math.min(this.width, x1), top + 0.5);
+      for (let s = sx0; s <= sx1 + 1e-6; s += minor) {
+        const x = Math.round(x0 + s * z) + 0.5;
+        g.moveTo(x, top); g.lineTo(x, top - (isMajor(s) ? len : len * 0.5));
+      }
+    }
+    if (drawLeft) {
+      g.moveTo(left + 0.5, Math.max(0, y0)); g.lineTo(left + 0.5, Math.min(this.height, y1));
+      for (let s = sy0; s <= sy1 + 1e-6; s += minor) {
+        const y = Math.round(y0 + s * z) + 0.5;
+        g.moveTo(left, y); g.lineTo(left - (isMajor(s) ? len : len * 0.5), y);
+      }
+    }
+    g.stroke();
+    if (drawTop) {
+      g.textAlign = 'left';
+      for (let s = Math.ceil(sx0 / major) * major; s <= sx1; s += major) g.fillText(String(s), x0 + s * z + 3 * dpr, top - len - 3 * dpr);
+    }
+    if (drawLeft) {
+      for (let s = Math.ceil(sy0 / major) * major; s <= sy1; s += major) {
+        g.save();
+        g.translate(left - len - 4 * dpr, y0 + s * z - 3 * dpr);
+        g.rotate(-Math.PI / 2);
+        g.textAlign = 'left';
+        g.fillText(String(s), 0, 0);
+        g.restore();
+      }
+    }
+    g.restore();
+  }
+
+  /** 1-sigma outlines of the Gaussians inside the view, each in its own colour. */
+  private drawOutlines(g: CanvasRenderingContext2D, t: RoiTransform, dpr: number): void {
+    const cpu = this.model?.cpu;
+    const info = this.outlineInfo;
+    info.visible = 0;
+    info.drawn = 0;
+    info.tooFar = this.zoom < OUTLINE_MIN_ZOOM;
+    if (!cpu || info.tooFar) return;
+    const z = this.zoom;
+    const L = Math.max(t.W, t.H);
+    const ox = this.offsetX;
+    const oy = this.offsetY;
+    // source-pixel window of the canvas, padded by the largest plausible outline
+    const pad = 64;
+    const wx0 = (0 - ox) / z - pad, wx1 = (this.width - ox) / z + pad;
+    const wy0 = (0 - oy) / z - pad, wy1 = (this.height - oy) / z + pad;
+    const N = cpu.length / 9;
+    g.save();
+    g.lineWidth = Math.max(1, 1 * dpr);
+    g.globalAlpha = 0.9;
+    for (let i = 0; i < N; i++) {
+      const b = 9 * i;
+      const cx = cpu[b + OFFSET.uv] * t.W;
+      const cy = cpu[b + OFFSET.uv + 1] * t.H;
+      if (cx < wx0 || cx > wx1 || cy < wy0 || cy > wy1) continue;
+      info.visible++;
+      if (info.drawn >= OUTLINE_MAX) continue;
+      const sx = Math.exp(cpu[b + OFFSET.log_s]) * L * z;
+      const sy = Math.exp(cpu[b + OFFSET.log_s + 1]) * L * z;
+      const th = cpu[b + OFFSET.rot];
+      const r = Math.max(0, Math.min(1, cpu[b + OFFSET.color])) * 255;
+      const gg = Math.max(0, Math.min(1, cpu[b + OFFSET.color + 1])) * 255;
+      const bb = Math.max(0, Math.min(1, cpu[b + OFFSET.color + 2])) * 255;
+      g.strokeStyle = `rgb(${r | 0},${gg | 0},${bb | 0})`;
+      g.beginPath();
+      // the kernel's R = [[c, s], [-s, c]] maps the first axis to (cos th, -sin th): canvas rotation -th
+      g.ellipse(ox + cx * z, oy + cy * z, Math.max(0.3, sx), Math.max(0.3, sy), -th, 0, 2 * Math.PI);
+      g.stroke();
+      info.drawn++;
+    }
+    g.restore();
   }
 
   private label(g: CanvasRenderingContext2D, text: string, x: number, y: number, align: 'left' | 'right', dpr: number): void {
@@ -428,7 +648,14 @@ export class Viewer {
           c.style.cursor = this.roi.cursorFor(this.roi.hitTest(sx, sy, t));
         } else c.style.cursor = 'grab';
       }
+      if (t && this.events.onHover) {
+        const [sx, sy] = this.toSource(x, y);
+        const inside = sx >= 0 && sy >= 0 && sx < t.W && sy < t.H;
+        if (inside) { this.hoverOn = true; this.events.onHover(sx, sy); }
+        else if (this.hoverOn) { this.hoverOn = false; this.events.onHover(null, null); }
+      }
     });
+    c.addEventListener('pointerleave', () => { if (this.hoverOn) { this.hoverOn = false; this.events.onHover?.(null, null); } });
     const stop = () => {
       if (this.drag === 'roi') this.roi.end();
       this.drag = null;
@@ -492,6 +719,7 @@ export class Viewer {
   }
 
   destroy(): void {
+    this.errorMap?.close();
     this.raster?.destroy();
     this.edge?.destroy();
     this.bufA?.destroy();

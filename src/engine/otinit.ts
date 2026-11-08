@@ -11,6 +11,10 @@ export interface OtInitOptions {
   K?: number;
   /** Transport-grid cells on the long side (default: nLongFor(H, W)). */
   nLong?: number;
+  /** Progress of the three phases (density on the CPU, transport on the GPU, lattice parameters on the CPU). */
+  onPhase?: (phase: 'density' | 'transport' | 'params', info: { grid: { ny: number; nx: number }; gy: number; gx: number; lam: number; ms: number }) => void;
+  /** Every Sinkhorn eps-scaling stage with its barycentric map (ny x nx x 2, box units; x pixels = map x long side). */
+  onStage?: (T: Float32Array, stage: number, stages: number, eps: number, grid: { ny: number; nx: number }) => void;
 }
 
 export interface OtInitResult {
@@ -40,11 +44,15 @@ export async function otInit(ctx: GpuContext, pipes: Pipelines, rgb: Float32Arra
   let t = performance.now();
   const rho = pooledDensity(pixelDensity(rgb, W, H, lam), W, H, grid);
   const tDensity = performance.now() - t;
+  opts.onPhase?.('density', { grid, gy, gx, lam, ms: tDensity });
   t = performance.now();
-  const { T, eps, iters } = await transportMap(ctx, pipes, rho, grid, W / L, H / L);
+  const onStage = opts.onStage;
+  const { T, eps, iters } = await transportMap(ctx, pipes, rho, grid, W / L, H / L, onStage ? { onStage: (m, s, n, e) => onStage(m, s, n, e, grid) } : {});
   const tTransport = performance.now() - t;
+  opts.onPhase?.('transport', { grid, gy, gx, lam, ms: tTransport });
   t = performance.now();
   const { params } = paramsFromMap(rgb, W, H, gy, gx, T, grid);
   const tParams = performance.now() - t;
+  opts.onPhase?.('params', { grid, gy, gx, lam, ms: tParams });
   return { params, count: gy * gx, gy, gx, lam, nLong, grid, rho, T, iters, eps, ms: { density: tDensity, transport: tTransport, params: tParams } };
 }

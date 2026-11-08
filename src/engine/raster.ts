@@ -26,7 +26,7 @@ export interface ViewParams {
 
 export const VIEW_BYTES = 64;
 
-export function packView(v: ViewParams, count: number, entryCap: number, gradScale: number): ArrayBuffer {
+export function packView(v: ViewParams, count: number, entryCap: number, gradScale: number, lossKind = 0): ArrayBuffer {
   const ab = new ArrayBuffer(VIEW_BYTES);
   const f = new Float32Array(ab);
   const u = new Uint32Array(ab);
@@ -44,6 +44,7 @@ export function packView(v: ViewParams, count: number, entryCap: number, gradSca
   u[11] = Math.ceil(v.outH / TILE);
   u[12] = count;
   u[13] = entryCap;
+  u[14] = lossKind;
   return ab;
 }
 
@@ -67,6 +68,7 @@ export class Rasterizer {
   entryVersion = 0;
   private view: ViewParams | null = null;
   private gradScale = 0;
+  private lossKind = 0;
   private readonly scanTiles: ScanPlan;
   private readonly scanG: ScanPlan;
   private bgPre: GPUBindGroup;
@@ -124,15 +126,16 @@ export class Rasterizer {
     if (cap > this.entryCap) this.allocEntries(cap);
   }
 
-  setView(view: ViewParams, gradScale = 0): void {
+  setView(view: ViewParams, gradScale = 0, lossKind = 0): void {
     if (view.outW !== this.outW || view.outH !== this.outH) throw new Error('view size does not match the rasteriser');
     this.view = view;
     this.gradScale = gradScale;
+    this.lossKind = lossKind;
     this.writeView();
   }
 
   private writeView(): void {
-    this.device.queue.writeBuffer(this.viewBuf, 0, packView(this.view!, this.count, this.entryCap, this.gradScale));
+    this.device.queue.writeBuffer(this.viewBuf, 0, packView(this.view!, this.count, this.entryCap, this.gradScale, this.lossKind));
   }
 
   /** Projects the Gaussians and builds the tile lists for the current view. */

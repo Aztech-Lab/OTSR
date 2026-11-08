@@ -31,11 +31,14 @@ Android; Safari 26+ on macOS / iOS — and a GPU. Integrated GPUs work; a discre
 2. Serve it over HTTP — browsers do not run WebGPU modules from `file://`:
    - Windows: double-click `serve.bat` (needs [Node.js](https://nodejs.org) 20+), or
    - any OS: `node tools/serve.mjs`, or `python -m http.server -d dist 8787`, or any static web server.
-3. Open the printed address, drop an image onto the view, pick a quality (Fast / Standard / Best) and press
-   **Fit & Enhance**. Drag the divider to compare with bicubic interpolation, zoom with the wheel, pan by dragging.
-   The **Research** mode exposes every parameter and the analysis tools.
-4. **Export PNG** at the chosen scale, or **Save .otsr** to keep the model (a few MB; re-renderable at any size
-   later with **Load .otsr**).
+3. Open the printed address, drop an image onto the view, pick a preset (Fast / Standard / Best) and press
+   **Enhance**. Drag the divider to compare with bicubic interpolation, zoom with the wheel, pan by dragging.
+   While it runs, the view plays the real process: the optimal-transport lattice settling on the image, the
+   Gaussians growing into a watercolour, a scan line revealing the result; a monitor shows the regions changing most.
+   The **Research** mode exposes every parameter (budget, steps, edge width, L1 / L2 loss) and the analysis tools
+   (Gaussian outlines, error map, region of interest, PSNR curve).
+4. **Export PNG** at 1× to 16× or any scale, or **Save .otsr** to keep the model (a few MB; re-renderable at any
+   size later with **Load .otsr**).
 
 See [docs/getting-started.md](docs/getting-started.md) for the details and
 [docs/troubleshooting.md](docs/troubleshooting.md) if WebGPU does not start (dual-GPU laptops in particular).

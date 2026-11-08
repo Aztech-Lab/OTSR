@@ -14,10 +14,24 @@ function container(): HTMLElement {
 
 export type ToastKind = 'info' | 'success' | 'error';
 
-export function toast(message: string, kind: ToastKind = 'info', ms = kind === 'error' ? 0 : 5000): void {
+/** Errors open the alert dialog (#alert in index.html); everything else is a toast that fades after `ms`. */
+export function toast(message: string, kind: ToastKind = 'info', ms = 5000): void {
+  if (kind === 'error') return showAlert(message);
   const el = h('div', { class: `toast ${kind}` }, h('span', { class: 'msg' }, message));
   const close = h('button', { class: 'close', title: 'Dismiss', onClick: () => el.remove() }, icon('x', 14));
   el.appendChild(close);
   container().appendChild(el);
   if (ms > 0) setTimeout(() => el.remove(), ms);
+}
+
+/** The error popup: one modal dialog, new messages are appended while it is open; OK / Esc close it. */
+export function showAlert(message: string): void {
+  const dlg = document.getElementById('alert') as HTMLDialogElement | null;
+  const body = document.getElementById('alert-msg');
+  if (!dlg || !body) { console.error(message); return; }
+  if (dlg.open) body.append(h('div', null, message));
+  else {
+    body.replaceChildren(h('div', null, message));
+    dlg.showModal();
+  }
 }

@@ -10,8 +10,10 @@
 </head>
 <body data-mode="simple" class="empty">
   <div id="stage">
+    <div class="bg" aria-hidden="true"><i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i><i class="hex h1"></i><i class="hex h2"></i><i class="hex h3"></i><i class="sweep"></i></div>
     <canvas id="view"></canvas>
     <canvas id="overlay" aria-hidden="true"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
   </div>
   <div id="frame" class="frame" hidden><i></i><i></i><i></i><i></i><span class="tag" id="frame-tag">SAMPLE // 01</span><span class="scan"></span></div>
 
@@ -20,12 +22,23 @@
     <div class="row2"><span class="barcode" aria-hidden="true"></span><span class="micro">Optimal-transport Gaussian super-resolution</span></div>
   </header>
 
+  <div id="command" class="float command">
+    <div id="cmd-idle">
+      <button id="cmd-fit" class="btn copper big" title="Fit the Gaussians to the image (F)"><span id="cmd-fit-label">Enhance</span><span class="arrow">▶</span></button>
+      <div class="micro" id="cmd-sub"></div>
+    </div>
+    <div id="cmd-live" class="live" hidden>
+      <div class="head"><span class="micro"><span class="sq blink"></span>&nbsp; <span id="live-title">Fitting</span></span><span class="micro" id="live-step"></span></div>
+      <div class="nums" id="live-nums"><b id="live-psnr">—</b><span>dB PSNR</span><em id="live-rate"></em><em id="live-left"></em></div>
+      <svg id="live-curve" class="spark" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true"><polyline points=""/></svg>
+      <div class="progress" id="live-progress"></div>
+      <div class="foot"><span class="micro" id="live-text"></span><button id="cmd-stop" class="textbtn" title="Stop (Esc)">Stop ×</button></div>
+    </div>
+  </div>
+
   <nav class="float sysnav" aria-label="System">
     <button id="nav-open" class="navbtn" title="Open an image (O)"><span class="key">O</span><span class="label">Open</span></button>
-    <div class="seg modes" role="radiogroup" aria-label="Mode">
-      <input type="radio" name="mode" id="mode-simple" value="simple" checked><label for="mode-simple">Simple</label>
-      <input type="radio" name="mode" id="mode-research" value="research"><label for="mode-research">Research</label>
-    </div>
+    <button id="theme-btn" class="themebtn" title="Switch between the light and the dark theme" aria-pressed="false"><span class="ico" id="theme-ico">☾</span><span class="two"><b id="theme-en">Dark mode</b><small id="theme-zh">深色模式</small></span></button>
     <button id="settings-btn" class="navbtn" title="Settings"><span class="label">Settings</span><span class="key">⚙</span></button>
     <button id="help-btn" class="navbtn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><span class="key">?</span></button>
   </nav>
@@ -50,7 +63,7 @@
     <div class="center">
       <div class="micro">■ Input required</div>
       <h2>Drop image</h2>
-      <div class="zh">拖入 · 粘贴 · 选择</div>
+      <div class="zh">拖入 · 貼上 · 選擇</div>
       <div class="open"><button id="empty-open" class="btn solid"><span>Open image</span><span class="arrow">→</span></button></div>
       <div id="empty-samples" class="links" hidden></div>
     </div>
@@ -59,11 +72,19 @@
     <span class="corner-note bl">PNG · JPEG · WEBP<br>AVIF · BMP · GIF</span>
     <span class="corner-note br" id="corner-gpu">GPU: —</span>
   </section>
+  <div id="boot" class="float bootlog" aria-hidden="true"></div>
 
   <aside id="inspector" class="float console" aria-label="Controls">
-    <div class="console-head"><span id="console-title">Control // 01</span><span class="hatch"></span><span id="console-state"><span class="sq ok"></span> idle</span></div>
+    <div class="console-head"><span id="console-title">Control // 01</span><span class="hatch"></span><span id="console-state"><span class="sq ok"></span> idle</span><button id="console-collapse" class="headbtn" title="Collapse the console · 收起">‹</button></div>
     <div id="panel" class="console-body"></div>
   </aside>
+  <button id="left-tab" class="float paneltab left" title="Open the console · 展開控制台"><i>›</i><span>Control</span><small>控制台</small></button>
+
+  <aside id="monitor" class="float monitor" aria-label="Monitor">
+    <div class="console-head"><span>Monitor // Active regions</span><span class="hatch"></span><span class="zh">活躍區域</span><button id="monitor-collapse" class="headbtn" title="Hide the monitor · 收起">›</button></div>
+    <div id="monitor-body" class="console-body"></div>
+  </aside>
+  <button id="right-tab" class="float paneltab right" title="Open the monitor · 展開監視器"><i>‹</i><span>Monitor</span><small>監視器</small></button>
 
   <div class="float result-hud" id="readout">
     <div class="micro">■ Enhancement complete</div>
@@ -88,6 +109,7 @@
     <span><i id="status-dot" class="sq ok"></i>&nbsp; Status</span>
     <span class="fill" id="status"></span>
     <span class="seg-count" id="seg-count" aria-hidden="true"></span>
+    <span class="cursor" id="cursor">X — Y —</span>
     <span class="right"><span id="adapter">GPU —</span> &nbsp;·&nbsp; <span id="clock">--:--:--</span> &nbsp;·&nbsp; <button id="reload-btn" class="textbtn">Reinit ↗</button></span>
   </footer>
 
@@ -102,22 +124,32 @@
   </div>
 
   <dialog id="settings" class="modal">
-    <div class="console-head"><span>System // Preferences</span><span class="hatch"></span><button id="settings-close" class="textbtn" style="color:inherit">Close ×</button></div>
+    <div class="console-head"><span>System // Preferences</span><span class="hatch"></span><button id="settings-close" class="textbtn head">Close ×</button></div>
     <div class="body">
-      <h2>Settings<small>偏好设置</small></h2>
-      <div class="setting"><div class="lab">Theme<small>明暗主题</small></div><div class="seg" id="theme-seg"></div></div>
-      <div class="setting"><div class="lab">Mode<small>简单模式只保留核心功能；科研模式开放全部参数与分析工具</small></div><div class="seg" id="mode-seg"></div></div>
-      <div class="setting"><div class="lab">Motion<small>圆环旋转、扫描线等装饰动效</small></div><label class="switch" style="margin:0"><input type="checkbox" id="motion-toggle"><span class="tg"></span></label></div>
+      <h2>Settings<small>偏好設定</small></h2>
+      <div class="setting"><div class="lab">Theme<small>明暗主題</small></div><div class="seg" id="theme-seg"></div></div>
+      <div class="setting"><div class="lab">Mode<small>簡單模式只保留核心功能；科研模式開放全部參數與分析工具</small></div><div class="seg" id="mode-seg"></div></div>
+      <div class="setting"><div class="lab">Fit animation<small>擬合過程的傳輸網格、水彩與掃描線動畫；關閉後直接顯示即時渲染</small></div><label class="switch" style="margin:0"><input type="checkbox" id="anim-toggle"><span class="tg"></span></label></div>
+      <div class="setting"><div class="lab">Motion<small>圓環旋轉、背景漂移、掃描線等裝飾動效</small></div><label class="switch" style="margin:0"><input type="checkbox" id="motion-toggle"><span class="tg"></span></label></div>
       <div class="modal-foot"><span>OTSR 0.1.0 · MIT · runs on your GPU</span><a href="docs/index.md" target="_blank">Documentation ↗</a></div>
     </div>
   </dialog>
 
   <dialog id="help" class="modal">
-    <div class="console-head"><span>System // Keyboard</span><span class="hatch"></span><button id="help-close" class="textbtn" style="color:inherit">Close ×</button></div>
+    <div class="console-head"><span>System // Keyboard</span><span class="hatch"></span><button id="help-close" class="textbtn head">Close ×</button></div>
     <div class="body">
-      <h2>Shortcuts<small>快捷键</small></h2>
+      <h2>Shortcuts<small>快捷鍵</small></h2>
       <table><tbody id="help-table"></tbody></table>
       <div class="modal-foot"><span>Drag to pan · scroll to zoom · drop or paste anywhere</span><a href="docs/README.md" target="_blank">README ↗</a></div>
+    </div>
+  </dialog>
+
+  <dialog id="alert" class="modal alert">
+    <div class="console-head"><span>System // Error</span><span class="hatch"></span><span class="zh">錯誤</span></div>
+    <div class="body">
+      <h2>Something went wrong<small>出錯了</small></h2>
+      <div id="alert-msg" class="alert-msg"></div>
+      <div class="modal-foot"><span>The status strip keeps the last message</span><button id="alert-close" class="btn solid"><span>OK</span><span class="arrow">↵</span></button></div>
     </div>
   </dialog>
   <script type="module" src="/src/app/main.ts"></script>

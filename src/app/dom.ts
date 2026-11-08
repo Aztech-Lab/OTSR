@@ -66,3 +66,14 @@ export function fmtBytes(b: number): string {
 export function fmtInt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
+
+/** Draws a PSNR curve into an SVG polyline (viewBox 0 0 240 36). */
+export function sparkline(svg: SVGSVGElement, pts: { step: number; psnr: number }[], steps: number): void {
+  const line = svg.querySelector('polyline');
+  if (!line) return;
+  if (pts.length < 2 || !(steps > 0)) { line.setAttribute('points', ''); return; }
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) { lo = Math.min(lo, p.psnr); hi = Math.max(hi, p.psnr); }
+  const span = Math.max(0.5, hi - lo);
+  line.setAttribute('points', pts.map((p) => `${((p.step / steps) * 240).toFixed(1)},${(34 - ((p.psnr - lo) / span) * 32).toFixed(1)}`).join(' '));
+}

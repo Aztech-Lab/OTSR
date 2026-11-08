@@ -40,24 +40,44 @@ The switch in the header picks the mode; the choice and every setting are rememb
    paper setting) or *Best* (1 per 7 pixels, 4000 steps). Below the choice: the Gaussian count, the GPU memory the fit
    will take and, once one fit has run on this machine, the expected time. *Crisp edges at magnification* is the
    distance-field edge pass; leave it on unless you want the plain Gaussian render.
-3. **Fit & Enhance**, then **Export** at 2×, 4×, 8× or any factor (the output size is shown), or **Save model**
-   (`.otsr`, 36 bytes per Gaussian) to re-open later with *Load model…* without a new fit.
+3. **Enhance** — the copper button at the top centre (`F` or Enter). While it runs, the button becomes a live
+   readout: step, PSNR, iterations per second, time left and the PSNR curve; *Stop* (or Esc) keeps what has been
+   fitted so far. Then **Export PNG** at 1×, 2×, 4×, 8×, 16× or any factor (the output size is shown under each
+   choice), or **Save model** (`.otsr`, 36 bytes per Gaussian) to re-open later with *Load model…* without a new fit.
+
+While the fit runs the view plays the process itself (*Fit animation* in the settings): the uniform lattice, then the
+real stages of the optimal-transport initialisation (the barycentric map after every ε-scaling stage of the Sinkhorn
+loop) as a glowing mesh that settles on the image structure; then the Gaussians at their actual positions, read back
+from the GPU every 0.6 s, growing from nothing into a random watercolour; finally a scan line from left to right
+reveals the fitted image. A **monitor** panel slides in from the right with the four regions where the Gaussians are
+changing most (measured from the parameters between two snapshots), each as a live render of the model; it closes
+when the fit ends and reopens from the tab on the right edge. The console on the left logs the real steps (density,
+Sinkhorn stages, upload, optimisation, readback, edge pass) and collapses to a tab with the arrow in its head.
 
 After the fit the view shows a **split comparison**: bicubic interpolation of the original on the left of the divider,
 OTSR on the right. Drag the divider, zoom in (wheel, `+`/`−`, the toolbar) and pan (drag) to inspect; press `0` to fit
 the image to the view and `1` for actual pixels. Hold `B` to see bicubic everywhere, `N` for nearest neighbour and `R`
-for the raw Gaussians without the edge pass. The toolbar's *Compare* button (or `C`) toggles the divider.
+for the raw Gaussians without the edge pass. The toolbar's *Compare* button (or `C`) toggles the divider. Pixel rulers
+run along the top and left edge of the image and the status strip shows the source pixel under the cursor. The canvas
+is clipped to the image, so the slowly moving stage shows around it when zoomed out. The *GPU mem* readout is an
+estimate from the engine's allocations before the fit and the allocated figure afterwards. Errors open a dialog; the
+status strip keeps the last message. The light / dark button sits at the top right; *System* follows the OS theme.
 
 **Research** — the same workflow with every parameter exposed and the analysis tools:
 
 - *Custom* quality with the budget (Gaussians per pixel) and the step count; the edge width slider (the transition width
-  of the edge pass in output pixels, 1.4 by default: smaller is harder, larger softer).
+  of the edge pass in output pixels, 1.4 by default: smaller is harder, larger softer); the pixel loss — *L2* (mean
+  squared error, the paper setting) or *L1* (Charbonnier, ε = 10⁻³; PSNR is always reported against the source).
 - *View*: OTSR, Gaussians only (no edge pass), and the classic resamplers of the source — bicubic, bilinear, nearest —
-  plus the split comparison against any of them.
+  plus the split comparison against any of them. Two analysis layers: **Gaussians 1σ** (`G`) draws the 1-sigma outline
+  of every Gaussian in view in its own colour from 2× zoom on; **Error map** (`D`) renders the model at 1× and shows
+  |model − source| per pixel on an inferno scale whose gain follows the 99.5th percentile (the mean and maximum error
+  and the white point are listed under the switches).
 - *Region of interest*: one rectangle in source pixels shared by every analysis tool. Press `M` (or the *Region*
   button), drag on the view to draw it, drag the corners to resize, nudge it with the arrow keys (Shift: 10 px), hold
   Space to pan meanwhile. *Zoom to region* frames it.
-- *Session*: the adapter, the model and the measured throughput of this GPU.
+- *Session*: the adapter, the model, the measured throughput of this GPU and the PSNR curve of the last fit.
+- Research mode sets the text in a serif face; the controls and readouts are the same.
 
 Research mode gains more tools over time (comparison figures of the region across methods, error maps, the Gaussian
 structure view, fit curves); the CHANGELOG lists what is in.

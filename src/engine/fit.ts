@@ -26,6 +26,8 @@ export interface FitOptions {
   checkEvery?: number;
   /** Check the tile-entry capacity synchronously before every forward pass (no step ever runs with truncated lists). */
   exact?: boolean;
+  /** Pixel loss: 'l2' (mean squared error, the reference) or 'l1' (Charbonnier, eps 1e-3). Default 'l2'. */
+  loss?: 'l2' | 'l1';
 }
 
 export interface FitResult {
@@ -56,7 +58,7 @@ export async function runFit(ctx: GpuContext, pipes: Pipelines, source: FitSourc
   const params = own ? uploadBuffer(device, source, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST, 'params') : source.buffer;
   const raster = new Rasterizer(ctx, pipes, params, N, W, H, Math.max(4096, N));
   const fitter = new Fitter(ctx, pipes, raster, gtRgba);
-  raster.setView({ srcW: W, srcH: H, zoom: 1, offsetX: 0, offsetY: 0, aa: 0, outW: W, outH: H }, fitter.gradScale);
+  raster.setView({ srcW: W, srcH: H, zoom: 1, offsetX: 0, offsetY: 0, aa: 0, outW: W, outH: H }, fitter.gradScale, opts.loss === 'l1' ? 1 : 0);
   const curve: FitProgress[] = [];
   const t0 = performance.now();
   let entries = 0;

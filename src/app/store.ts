@@ -9,6 +9,44 @@ export type Preset = 'fast' | 'standard' | 'best' | 'custom';
 export type Theme = 'auto' | 'light' | 'dark';
 export type CompareMode = 'off' | 'split';
 export type ViewMode = 'otsr' | 'raw' | 'bicubic' | 'bilinear' | 'nearest';
+export type Loss = 'l2' | 'l1';
+
+/** Research overlays drawn on the viewer: 1-sigma Gaussian outlines and the |error| map of the fit. */
+export interface Layers {
+  gaussians: boolean;
+  error: boolean;
+}
+
+/** The running fit, for the live readout. */
+export interface LiveFit {
+  step: number;
+  steps: number;
+  psnr: number;
+  /** Steps per second. */
+  rate: number;
+  /** Estimated seconds left (NaN until known). */
+  left: number;
+}
+
+/** A region where the Gaussians changed most between two snapshots of the fit (the monitor panel). */
+export interface ActiveRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Relative activity 0..1 (1 = the most active region). */
+  score: number;
+  label: string;
+}
+
+export interface ErrorStats {
+  /** Mean absolute error, 8-bit units. */
+  mae: number;
+  /** Largest per-pixel error, 8-bit units. */
+  max: number;
+  /** Display gain of the map (error x gain -> 0..1). */
+  gain: number;
+}
 
 export interface Prefs {
   mode: Mode;
@@ -17,11 +55,16 @@ export interface Prefs {
   steps: number;
   edges: boolean;
   edgePx: number;
+  loss: Loss;
   scale: number;
   compare: CompareMode;
   compareWith: 'bicubic' | 'bilinear' | 'nearest';
   theme: Theme;
   motion: boolean;
+  /** The fit animation (OT lattice, watercolour, scan reveal); off = live render while fitting. */
+  fitAnim: boolean;
+  /** The control console on the left is open. */
+  panelLeft: boolean;
   /** Measured Gaussian-steps per second of this machine, for time estimates (0 = unknown). */
   throughput: number;
   sections: Record<string, boolean>;
@@ -70,6 +113,16 @@ export interface AppState {
   status: { text: string; error: boolean };
   /** Last progress lines of the running / finished job (newest last). */
   log: string[];
+  live: LiveFit | null;
+  /** PSNR curve of the last / running fit. */
+  curve: { step: number; psnr: number }[];
+  layers: Layers;
+  errorStats: ErrorStats | null;
+  /** The monitor panel on the right is open. */
+  monitor: boolean;
+  regions: ActiveRegion[];
+  /** Tile entries of the last fit (for the exact GPU memory figure), 0 = unknown. */
+  fitEntries: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -79,11 +132,14 @@ export const DEFAULT_PREFS: Prefs = {
   steps: 3000,
   edges: true,
   edgePx: 1.4,
+  loss: 'l2',
   scale: 4,
   compare: 'split',
   compareWith: 'bicubic',
   theme: 'light',
   motion: true,
+  fitAnim: true,
+  panelLeft: true,
   throughput: 0,
   sections: {},
 };
@@ -123,6 +179,13 @@ export class Store {
       zoom: 1,
       status: { text: '', error: false },
       log: [],
+      live: null,
+      curve: [],
+      layers: { gaussians: false, error: false },
+      errorStats: null,
+      monitor: false,
+      regions: [],
+      fitEntries: 0,
     };
   }
 

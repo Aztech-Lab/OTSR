@@ -2,13 +2,15 @@
 // the job runner, so only one thing runs at a time and every failure is reported the same way.
 
 import { decodeOtsr, encodeOtsr } from '../core/fileformat';
-import { otInit, renderImage, runFit, uploadBuffer, type GpuContext, type Pipelines } from '../engine';
-import { fmtInt, fmtSeconds } from './dom';
+import { otInit, readBuffer, renderImage, runFit, uploadBuffer, type GpuContext, type Pipelines } from '../engine';
+import { fmtBytes, fmtInt, fmtSeconds } from './dom';
+import type { FitShow } from './fitshow';
+import type { Monitor } from './monitor';
 import { MAX_PIXELS, WARN_PIXELS, decodeImageFile, downloadBlob, encodePng, imageFromRgba8, stem, type LoadedImage } from './image';
 import type { JobRunner } from './jobs';
 import { effectiveSettings, gaussianCount } from './presets';
 import { defaultRoi } from './roi';
-import type { AppModel, FitSummary, Store } from './store';
+import type { AppModel, FitSummary, Layers, Store } from './store';
 import { toast } from './toast';
 import type { Viewer } from './viewer';
 
@@ -18,7 +20,30 @@ export interface SampleEntry {
   h: number;
 }
 
+/** Display gain of the error map: 1 / (99.5th percentile of |error|), kept between 4 and 128 (16 = white from 16/255). */
+const ERROR_GAIN_MIN = 4;
+const ERROR_GAIN_MAX = 128;
+/** Inferno-like colour scale, 256 RGB entries interpolated from 8 anchors. */
+const ERROR_LUT: Uint8ClampedArray = (() => {
+  const k = [[0, 0, 4], [40, 11, 84], [101, 21, 110], [159, 42, 99], [212, 72, 66], [245, 125, 21], [250, 193, 39], [252, 255, 164]];
+  const lut = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const x = (i / 255) * (k.length - 1);
+    const j = Math.min(k.length - 2, Math.floor(x));
+    const f = x - j;
+    for (let c = 0; c < 3; c++) lut[3 * i + c] = k[j][c] + (k[j + 1][c] - k[j][c]) * f;
+  }
+  return lut;
+})();
+
+/** Interval of the parameter snapshots during a fit (animation + monitor). */
+const SNAPSHOT_MS = 600;
+
 export class Actions {
+  /** The fit animation and the monitor panel, attached by main.ts once the DOM exists. */
+  show: FitShow | null = null;
+  monitor: Monitor | null = null;
+
   constructor(readonly store: Store, readonly ctx: GpuContext, readonly pipes: Pipelines, readonly viewer: Viewer, readonly jobs: JobRunner) {}
 
   // ---- images --------------------------------------------------------------------------------------------------
@@ -46,7 +71,8 @@ export class Actions {
     s.state.sourceBuf?.destroy();
     const sourceBuf = uploadBuffer(this.ctx.device, img.rgba, GPUBufferUsage.STORAGE, 'source');
     if (s.state.model && (s.state.model.W !== img.W || s.state.model.H !== img.H)) this.dropModel();
-    s.set({ image: img, sourceBuf, roi: null, lastFit: s.state.model ? s.state.lastFit : null });
+    s.set({ image: img, sourceBuf, roi: null, lastFit: s.state.model ? s.state.lastFit : null, errorStats: null });
+    this.viewer.setErrorMap(null);
     this.viewer.roi.set(null);
     this.viewer.setSource({ W: img.W, H: img.H, rgba: sourceBuf });
     if (!s.state.model) {
@@ -54,14 +80,15 @@ export class Actions {
       s.set({ viewMode: 'bicubic' });
     }
     this.viewer.fitToView();
-    s.setStatus(`${img.name} — ${img.W} × ${img.H}. ${s.state.model ? '' : 'Choose a quality and press Fit & Enhance.'}`);
+    s.setStatus(`${img.name} — ${img.W} × ${img.H}. ${s.state.model ? '' : 'Choose a preset and press Enhance.'}`);
   }
 
   dropModel(): void {
     const s = this.store;
     this.viewer.setModel(null);
+    this.viewer.setErrorMap(null);
     s.state.model?.params.destroy();
-    s.set({ model: null, lastFit: null });
+    s.set({ model: null, lastFit: null, errorStats: null });
   }
 
   setModel(params: Float32Array, W: number, H: number, meta: Record<string, unknown>, cpu = true): AppModel {
@@ -70,7 +97,7 @@ export class Actions {
     const buf = uploadBuffer(this.ctx.device, params, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST, 'model');
     const model: AppModel = { N, W, H, params: buf, cpu: cpu ? params : null, meta, saved: false };
     this.store.set({ model, viewMode: 'otsr' });
-    this.viewer.setModel({ N, W, H, params: buf });
+    this.viewer.setModel(model); // the same object: the outline layer sees `cpu` once the fit has filled it
     this.viewer.mode = 'otsr';
     return model;
   }
@@ -84,40 +111,159 @@ export class Actions {
     const { kPerPx, steps } = effectiveSettings(s.state.prefs);
     if (!(kPerPx > 0) || !(steps >= 1)) return void toast('Budget and steps must be positive.', 'error');
     const K = gaussianCount(kPerPx, img.W, img.H);
-    return this.jobs.run('Fit', async ({ signal, progress }) => {
+    const loss = s.state.prefs.loss ?? 'l2';
+    const prefs = s.state.prefs;
+    const show = prefs.fitAnim !== false && prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches ? this.show : null;
+    s.set({ live: null, curve: [], errorStats: null, monitor: true, fitEntries: 0 });
+    this.viewer.setErrorMap(null);
+    this.monitor?.reset(img.W, img.H);
+    const summary = await this.jobs.run('Fit', async ({ signal, progress }) => {
       const t0 = performance.now();
-      progress(-1, `Optimal-transport initialisation of ${fmtInt(K)} Gaussians …`);
-      const init = await otInit(this.ctx, this.pipes, img.rgb, img.W, img.H, { K });
-      if (signal.aborted) return { psnr: 0, seconds: 0, steps: 0, count: init.count, cancelled: true };
-      const model = this.setModel(init.params, img.W, img.H, {}, false);
-      s.setStatus(`Initialised ${fmtInt(init.count)} Gaussians in ${fmtSeconds((performance.now() - t0) / 1000)}; fitting …`);
-      this.viewer.compare = s.state.prefs.compare === 'split';
-      this.viewer.requestRender();
-      const res = await runFit(this.ctx, this.pipes, { buffer: model.params, count: model.N }, img.W, img.H, img.rgba, {
-        steps,
-        logEvery: 25,
-        signal,
-        onProgress: (p) => {
-          const rate = p.step / Math.max(1e-3, p.elapsedMs / 1000);
-          const left = p.step > 0 ? (p.steps - p.step) / rate : NaN;
-          progress(p.step / p.steps, `Step ${fmtInt(p.step)} / ${fmtInt(p.steps)} · ${p.psnr.toFixed(2)} dB · ${rate.toFixed(0)} it/s${p.step > 0 ? ` · ~${fmtSeconds(left)} left` : ''}`);
-          this.viewer.requestRender();
-        },
-      });
-      if (s.state.model !== model) return { psnr: 0, seconds: res.seconds, steps: 0, count: model.N, cancelled: true }; // replaced meanwhile
-      const last = res.curve[res.curve.length - 1];
-      model.cpu = res.params;
-      model.meta = {
-        generator: 'otsr-web 0.1.0', source: img.name, width: img.W, height: img.H, count: model.N, preset: s.state.prefs.preset,
-        k_per_px: kPerPx, steps: last?.step ?? 0, psnr: last?.psnr, seconds: res.seconds, adapter: this.ctx.info.description,
-      };
-      const summary: FitSummary = { psnr: last?.psnr ?? 0, seconds: res.seconds, steps: last?.step ?? 0, count: model.N, cancelled: res.cancelled };
-      if (!res.cancelled && res.seconds > 0.2) s.setPrefs({ throughput: (model.N * steps) / res.seconds });
-      s.set({ lastFit: summary, model });
-      s.setStatus(`${res.cancelled ? 'Fit stopped' : 'Fit finished'}: ${summary.psnr.toFixed(2)} dB after ${fmtInt(summary.steps)} steps in ${fmtSeconds(res.seconds)}. Drag the divider to compare; zoom in to inspect.`);
-      if (!res.cancelled) toast(`Fitted ${fmtInt(model.N)} Gaussians — ${summary.psnr.toFixed(2)} dB in ${fmtSeconds(res.seconds)}`, 'success');
-      this.viewer.requestRender();
-      return summary;
+      show?.start(img.W, img.H);
+      try {
+        progress(-1, `Optimal transport for ${fmtInt(K)} Gaussians · pixel density on the CPU …`);
+        const init = await otInit(this.ctx, this.pipes, img.rgb, img.W, img.H, {
+          K,
+          onPhase: (ph, i) => {
+            if (ph === 'density') progress(-1, `Density ρ (λ = ${i.lam.toFixed(3)}) pooled to ${i.grid.nx} × ${i.grid.ny} cells · ${i.ms.toFixed(0)} ms`);
+            else if (ph === 'transport') progress(-1, `Sinkhorn transport map on the GPU · ${i.ms.toFixed(0)} ms`);
+            else progress(-1, `Lattice ${i.gx} × ${i.gy} warped by the map, colours sampled · ${i.ms.toFixed(0)} ms`);
+          },
+          onStage: (T, k, n, eps, grid) => {
+            show?.otStage(T, grid);
+            if (k % 4 === 0 || k === n - 1) progress(-1, `OT ε-scaling stage ${k + 1} / ${n} · ε = ${eps.toExponential(1)}`);
+          },
+        });
+        show?.otDone();
+        if (signal.aborted) return { psnr: 0, seconds: 0, steps: 0, count: init.count, cancelled: true };
+        const model = this.setModel(init.params, img.W, img.H, {}, false);
+        s.setStatus(`Initialised ${fmtInt(init.count)} Gaussians in ${fmtSeconds((performance.now() - t0) / 1000)}; fitting …`);
+        progress(-1, `Uploaded ${fmtInt(model.N)} × 9 parameters (${fmtBytes(model.N * 36)}) · Adam moments cleared · ${loss.toUpperCase()} loss`);
+        this.viewer.compare = s.state.prefs.compare === 'split';
+        this.viewer.requestRender();
+        // snapshots of the parameters while the optimiser runs: the animation and the monitor read them
+        let fitting = true;
+        const bytes = model.N * 36;
+        const snapLoop = (async () => {
+          while (fitting) {
+            await new Promise((r) => setTimeout(r, SNAPSHOT_MS));
+            if (!fitting || s.state.model !== model) break;
+            try {
+              const p = new Float32Array(await readBuffer(this.ctx.device, model.params, bytes));
+              if (!fitting) break;
+              show?.snapshot(p);
+              this.monitor?.update(p);
+            } catch {
+              break;
+            }
+          }
+        })();
+        const res = await runFit(this.ctx, this.pipes, { buffer: model.params, count: model.N }, img.W, img.H, img.rgba, {
+          steps,
+          logEvery: 50,
+          checkEvery: 40, // fewer CPU-GPU round trips: the overlay animation runs on the same thread
+          signal,
+          loss,
+          onProgress: (p) => {
+            const rate = p.step / Math.max(1e-3, p.elapsedMs / 1000);
+            const left = p.step > 0 ? (p.steps - p.step) / rate : NaN;
+            progress(p.step / p.steps, `Step ${fmtInt(p.step)} / ${fmtInt(p.steps)} · ${p.psnr.toFixed(2)} dB · ${rate.toFixed(0)} it/s${p.step > 0 ? ` · ~${fmtSeconds(left)} left` : ''}`);
+            s.set({ live: { step: p.step, steps: p.steps, psnr: p.psnr, rate, left }, curve: [...s.state.curve, { step: p.step, psnr: p.psnr }] });
+            this.viewer.requestRender();
+          },
+        });
+        fitting = false;
+        await snapLoop;
+        if (s.state.model !== model) return { psnr: 0, seconds: res.seconds, steps: 0, count: model.N, cancelled: true }; // replaced meanwhile
+        const last = res.curve[res.curve.length - 1];
+        model.cpu = res.params;
+        model.meta = {
+          generator: 'otsr-web 0.1.0', source: img.name, width: img.W, height: img.H, count: model.N, preset: s.state.prefs.preset,
+          k_per_px: kPerPx, steps: last?.step ?? 0, psnr: last?.psnr, seconds: res.seconds, adapter: this.ctx.info.description, loss,
+        };
+        const summary: FitSummary = { psnr: last?.psnr ?? 0, seconds: res.seconds, steps: last?.step ?? 0, count: model.N, cancelled: res.cancelled };
+        if (!res.cancelled && res.seconds > 0.2) s.setPrefs({ throughput: (model.N * steps) / res.seconds });
+        progress(1, `Read back ${fmtInt(model.N)} Gaussians (${fmtBytes(bytes)}) · tile entries ${fmtInt(res.entries)}, capacity ${fmtInt(res.entryCap)}`);
+        progress(1, `Edge pass ready · distance field ${(s.state.prefs.edgePx ?? 1.4).toFixed(1)} px from 1.5× (view and export)`);
+        s.set({ lastFit: summary, model, live: null, fitEntries: res.entries });
+        this.monitor?.update(res.params);
+        s.setStatus(`${res.cancelled ? 'Fit stopped' : 'Fit finished'}: ${summary.psnr.toFixed(2)} dB after ${fmtInt(summary.steps)} steps in ${fmtSeconds(res.seconds)}. Drag the divider to compare; zoom in to inspect.`);
+        if (!res.cancelled) toast(`Fitted ${fmtInt(model.N)} Gaussians — ${summary.psnr.toFixed(2)} dB in ${fmtSeconds(res.seconds)}`, 'success');
+        this.viewer.requestRender();
+        if (show?.active) {
+          if (res.cancelled) show.cancel();
+          else {
+            if (!show.hasSnapshot) show.snapshot(res.params);
+            progress(1, `Scan reveal · ${summary.psnr.toFixed(2)} dB`);
+            await show.finish();
+          }
+        } else if (!res.cancelled && s.state.prefs.motion !== false) this.viewer.sweepSplit();
+        return summary;
+      } finally {
+        show?.cancel();
+      }
+    });
+    s.set({ live: null, monitor: false });
+    if (summary && s.state.layers.error) void this.refreshErrorMap();
+    return summary;
+  }
+
+  // ---- research layers -----------------------------------------------------------------------------------------
+
+  /** Switches an analysis layer on or off (the error map is computed on first use). */
+  setLayer(name: keyof Layers, on: boolean): void {
+    const layers = { ...this.store.state.layers, [name]: on };
+    this.store.set({ layers });
+    this.viewer.layers = layers;
+    if (name === 'error' && on && !this.viewer.hasErrorMap) void this.refreshErrorMap();
+    else this.viewer.refreshOverlay();
+  }
+
+  /** Renders the model at 1x and colours |model - source| per pixel (mean over RGB) with an inferno scale. */
+  async refreshErrorMap(): Promise<void> {
+    const s = this.store;
+    const m = s.state.model;
+    const img = s.state.image;
+    if (!m || !img || m.W !== img.W || m.H !== img.H) {
+      this.viewer.setErrorMap(null);
+      s.set({ errorStats: null });
+      if (m && !img) toast('The error map needs the model\'s source image.', 'info', 4000);
+      return;
+    }
+    if (s.busy) return;
+    await this.jobs.run('Error map', async ({ signal, progress }) => {
+      progress(-1, `Error map · rendering ${m.W} × ${m.H} at 1× without the edge pass …`);
+      const r = await renderImage(this.ctx, this.pipes, m.params, m.N, m.W, m.H, 1, { edges: false, signal });
+      const n = m.W * m.H;
+      const out = new Uint8ClampedArray(n * 4);
+      const gt = img.rgba;
+      const px = r.rgba;
+      const err = new Float32Array(n);
+      const hist = new Uint32Array(1024); // |error| in [0, 0.25) at 1/4096 resolution
+      let sum = 0;
+      let max = 0;
+      for (let i = 0; i < n; i++) {
+        const e = (Math.abs(px[4 * i] / 255 - gt[4 * i]) + Math.abs(px[4 * i + 1] / 255 - gt[4 * i + 1]) + Math.abs(px[4 * i + 2] / 255 - gt[4 * i + 2])) / 3;
+        err[i] = e;
+        sum += e;
+        if (e > max) max = e;
+        hist[Math.min(1023, (e * 4096) | 0)]++;
+      }
+      let acc = 0;
+      let bin = 0;
+      for (; bin < 1024 && acc < n * 0.995; bin++) acc += hist[bin];
+      const gain = Math.max(ERROR_GAIN_MIN, Math.min(ERROR_GAIN_MAX, 1 / Math.max(1e-4, (bin + 1) / 4096)));
+      for (let i = 0; i < n; i++) {
+        const k = 3 * Math.min(255, Math.round(err[i] * gain * 255));
+        out[4 * i] = ERROR_LUT[k];
+        out[4 * i + 1] = ERROR_LUT[k + 1];
+        out[4 * i + 2] = ERROR_LUT[k + 2];
+        out[4 * i + 3] = 255;
+      }
+      const bmp = await createImageBitmap(new ImageData(out, m.W, m.H));
+      if (s.state.model !== m) { bmp.close(); return; }
+      this.viewer.setErrorMap(bmp);
+      s.set({ errorStats: { mae: (sum / n) * 255, max: max * 255, gain } });
     });
   }
 

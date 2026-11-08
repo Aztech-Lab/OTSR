@@ -9,7 +9,7 @@ export { ScanPlan } from './scan';
 export { runFit } from './fit';
 export type { FitOptions, FitProgress, FitResult, FitSource } from './fit';
 export { transportMap } from './sinkhorn';
-export type { TransportResult } from './sinkhorn';
+export type { TransportResult, TransportOptions } from './sinkhorn';
 export { otInit } from './otinit';
 export { EdgePass } from './edges';
 export type { EdgeOptions } from './edges';

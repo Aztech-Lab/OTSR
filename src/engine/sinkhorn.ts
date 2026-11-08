@@ -32,11 +32,20 @@ export interface TransportResult {
   iters: number;
 }
 
+export interface TransportOptions {
+  /**
+   * Called for every eps-scaling stage (in order, after the loop has finished) with the barycentric map at that
+   * stage, same layout as `T`. The maps are projected into extra buffers inside the single submit, so the loop itself
+   * runs exactly as without the hook; the final map is unchanged.
+   */
+  onStage?: (T: Float32Array, stage: number, stages: number, eps: number) => void;
+}
+
 /**
  * Barycentric map of the entropic OT plan between the uniform density and `rho` (ny x nx, sums to 1) on the box
  * [0, ex] x [0, ey]. Float32 log-domain Sinkhorn with eps-scaling; the loop runs entirely on the GPU in one submit.
  */
-export async function transportMap(ctx: GpuContext, pipes: Pipelines, rho: Float32Array, grid: Grid, ex: number, ey: number): Promise<TransportResult> {
+export async function transportMap(ctx: GpuContext, pipes: Pipelines, rho: Float32Array, grid: Grid, ex: number, ey: number, opts: TransportOptions = {}): Promise<TransportResult> {
   const device = ctx.device;
   const n = grid.nx * grid.ny;
   if (rho.length !== n) throw new Error('rho does not match the grid');
@@ -64,9 +73,40 @@ export async function transportMap(ctx: GpuContext, pipes: Pipelines, rho: Float
   };
   const dispatch = grid1d(n);
   const stages = sinkhornSchedule(grid, ex, ey, SINKHORN_SHRINK, SINKHORN_ITERS_PER_STAGE, SINKHORN_FINAL_ITERS);
+  // barycentric projection at eps `e` into three output buffers (lse, x, y)
+  type Outs = { lse: GPUBuffer; x: GPUBuffer; y: GPUBuffer };
+  const project = (enc: GPUCommandEncoder, e: number, o: Outs): void => {
+    const uX0 = uniform(e, 0, 0, 0, 0);
+    const uX1 = uniform(e, 1, 0, 0, 0);
+    const uY0 = uniform(e, 0, 0, 1, 0);
+    const uY1 = uniform(e, 0, 1, 1, 0);
+    runPass(enc, pipes.lseX, bindGroup(device, pipes.lseX, { 0: uX0, 1: g, 2: inner }), dispatch);
+    runPass(enc, pipes.lseX, bindGroup(device, pipes.lseX, { 0: uX1, 1: g, 2: innerX }), dispatch);
+    runPass(enc, pipes.lseY, bindGroup(device, pipes.lseY, { 0: uY0, 1: inner, 2: o.lse, 3: bLmu }), dispatch);
+    runPass(enc, pipes.lseY, bindGroup(device, pipes.lseY, { 0: uY0, 1: innerX, 2: o.x, 3: bLmu }), dispatch);
+    runPass(enc, pipes.lseY, bindGroup(device, pipes.lseY, { 0: uY1, 1: inner, 2: o.y, 3: bLmu }), dispatch);
+  };
+  const readMap = async (o: Outs): Promise<Float32Array> => {
+    const [lse, lx, ly] = await Promise.all([readBuffer(device, o.lse, n * 4), readBuffer(device, o.x, n * 4), readBuffer(device, o.y, n * 4)]);
+    const L = new Float32Array(lse);
+    const X = new Float32Array(lx);
+    const Y = new Float32Array(ly);
+    const T = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      T[2 * i] = Math.exp(X[i] - L[i]);
+      T[2 * i + 1] = Math.exp(Y[i] - L[i]);
+    }
+    return T;
+  };
+  const finalOuts: Outs = { lse: outLse, x: outX, y: outY };
+  // with the stage hook, every intermediate stage gets its own output buffers inside the same submit
+  const stageOuts: Outs[] = opts.onStage
+    ? stages.slice(0, -1).map((_, i) => ({ lse: createBuffer(device, n * 4, S | GPUBufferUsage.COPY_SRC, `ot.stage${i}.lse`), x: createBuffer(device, n * 4, S | GPUBufferUsage.COPY_SRC, `ot.stage${i}.x`), y: createBuffer(device, n * 4, S | GPUBufferUsage.COPY_SRC, `ot.stage${i}.y`) }))
+    : [];
   const enc = device.createCommandEncoder({ label: 'sinkhorn' });
   let iters = 0;
-  for (const st of stages) {
+  for (let si = 0; si < stages.length; si++) {
+    const st = stages[si];
     const uX = uniform(st.e, 0, 0, 0, 0);
     const uF = uniform(st.e, 0, 0, -st.e, st.e);
     const bgXg = bindGroup(device, pipes.lseX, { 0: uX, 1: g, 2: inner }, 'lse_x(g)');
@@ -80,28 +120,16 @@ export async function transportMap(ctx: GpuContext, pipes: Pipelines, rho: Float
       runPass(enc, pipes.lseY, bgYg, dispatch);
       iters++;
     }
+    if (si < stageOuts.length) project(enc, st.e, stageOuts[si]);
   }
-  // barycentric projection at the final eps
   const e = stages[stages.length - 1].e;
-  const uX0 = uniform(e, 0, 0, 0, 0);
-  const uX1 = uniform(e, 1, 0, 0, 0);
-  const uY0 = uniform(e, 0, 0, 1, 0);
-  const uY1 = uniform(e, 0, 1, 1, 0);
-  runPass(enc, pipes.lseX, bindGroup(device, pipes.lseX, { 0: uX0, 1: g, 2: inner }), dispatch);
-  runPass(enc, pipes.lseX, bindGroup(device, pipes.lseX, { 0: uX1, 1: g, 2: innerX }), dispatch);
-  runPass(enc, pipes.lseY, bindGroup(device, pipes.lseY, { 0: uY0, 1: inner, 2: outLse, 3: bLmu }), dispatch);
-  runPass(enc, pipes.lseY, bindGroup(device, pipes.lseY, { 0: uY0, 1: innerX, 2: outX, 3: bLmu }), dispatch);
-  runPass(enc, pipes.lseY, bindGroup(device, pipes.lseY, { 0: uY1, 1: inner, 2: outY, 3: bLmu }), dispatch);
+  project(enc, e, finalOuts);
   device.queue.submit([enc.finish()]);
-  const [lse, lx, ly] = await Promise.all([readBuffer(device, outLse, n * 4), readBuffer(device, outX, n * 4), readBuffer(device, outY, n * 4)]);
-  const L = new Float32Array(lse);
-  const X = new Float32Array(lx);
-  const Y = new Float32Array(ly);
-  const T = new Float32Array(n * 2);
-  for (let i = 0; i < n; i++) {
-    T[2 * i] = Math.exp(X[i] - L[i]);
-    T[2 * i + 1] = Math.exp(Y[i] - L[i]);
+  const [T, ...stageMaps] = await Promise.all([readMap(finalOuts), ...stageOuts.map((o) => readMap(o))]);
+  if (opts.onStage) {
+    stageMaps.forEach((m, i) => opts.onStage!(m, i, stages.length, stages[i].e));
+    opts.onStage(T, stages.length - 1, stages.length, e);
   }
-  for (const b of [bLnu, bLmu, f, g, inner, innerX, outLse, outX, outY, ...uniforms]) b.destroy();
+  for (const b of [bLnu, bLmu, f, g, inner, innerX, outLse, outX, outY, ...uniforms, ...stageOuts.flatMap((o) => [o.lse, o.x, o.y])]) b.destroy();
   return { T, eps: e, iters };
 }
