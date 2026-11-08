@@ -1,11 +1,11 @@
-// Starlight over the stage, deep-space style: a few huge, very soft glows (hundreds of pixels across) drifting
-// slowly and breathing, a layer of medium soft stars that twinkle, some with long soft flares, and a sprinkling of
-// tiny sharp points for depth. White and the copper of the theme; on the light theme "white" becomes a soft ink
-// glow, since white would vanish. 2-D canvas at CSS resolution, 30 fps, a static frame when motion is off.
+// Starlight over the stage in the copper of the theme, deep-space style: a few huge, very soft glows (hundreds of
+// pixels across) drifting slowly and breathing, a layer of medium soft stars that twinkle, some with long soft
+// flares, and a sprinkling of tiny sharp points for depth. 2-D canvas at CSS resolution, 30 fps, a static frame
+// when motion is off.
 
 type Kind = 'glow' | 'star' | 'point';
 
-interface Star { kind: Kind; x: number; y: number; r: number; vx: number; vy: number; phase: number; rate: number; copper: boolean; flare: boolean }
+interface Star { kind: Kind; x: number; y: number; r: number; vx: number; vy: number; phase: number; rate: number; flare: boolean }
 
 const FPS = 30;
 const SPRITE = 128;
@@ -17,7 +17,7 @@ function cssVar(name: string, fallback: string): string {
 
 function rgba(hex: string, a: number): string {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-  return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : `rgba(255,255,255,${a})`;
+  return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : `rgba(217,162,95,${a})`;
 }
 
 /** A radial sprite: `core` is the radius fraction that stays at full strength (0 = a pure Gaussian-like glow). */
@@ -43,12 +43,9 @@ export class Stars {
   private raf = 0;
   private last = 0;
   private stars: Star[] = [];
-  private glowLight: HTMLCanvasElement | null = null;
-  private glowCopper: HTMLCanvasElement | null = null;
-  private starLight: HTMLCanvasElement | null = null;
-  private starCopper: HTMLCanvasElement | null = null;
-  private lightHex = '#ffffff';
-  private copperHex = '#d9a25f';
+  private glow: HTMLCanvasElement | null = null;
+  private star: HTMLCanvasElement | null = null;
+  private hex = '#d9a25f';
   private dark = true;
   private key = '';
   private frame = 0;
@@ -59,7 +56,7 @@ export class Stars {
     if (!g) throw new Error('2D background unavailable');
     this.g = g;
     const add = (kind: Kind, n: number, make: () => Partial<Star>) => {
-      for (let k = 0; k < n; k++) this.stars.push({ kind, x: Math.random(), y: Math.random(), r: 1, vx: 0, vy: 0, phase: Math.random() * 6.28, rate: 1, copper: Math.random() < 0.45, flare: false, ...make() });
+      for (let k = 0; k < n; k++) this.stars.push({ kind, x: Math.random(), y: Math.random(), r: 1, vx: 0, vy: 0, phase: Math.random() * 6.28, rate: 1, flare: false, ...make() });
     };
     // huge soft glows: a quarter of the screen across, barely moving, breathing over ~10 s
     add('glow', 8, () => ({ r: 110 + 170 * Math.random() ** 1.3, vx: (Math.random() - 0.5) * 2.4, vy: -(0.6 + 1.6 * Math.random()), rate: 0.25 + 0.25 * Math.random() }));
@@ -98,23 +95,20 @@ export class Stars {
 
   private sprites(): void {
     const dark = getComputedStyle(document.documentElement).colorScheme === 'dark';
-    const copper = cssVar('--copper-2', '#d9a25f');
-    const key = `${dark}|${copper}`;
+    const hex = cssVar('--copper-2', '#d9a25f');
+    const key = `${dark}|${hex}`;
     if (key === this.key) return;
     this.key = key;
     this.dark = dark;
-    this.lightHex = dark ? '#ffffff' : cssVar('--ink', '#111312');
-    this.copperHex = copper;
-    this.glowLight = sprite(this.lightHex, 0);
-    this.glowCopper = sprite(copper, 0);
-    this.starLight = sprite(this.lightHex, 0.12);
-    this.starCopper = sprite(copper, 0.12);
+    this.hex = hex;
+    this.glow = sprite(hex, 0);
+    this.star = sprite(hex, 0.12);
   }
 
   private draw(t: number, dt: number): void {
     const g = this.g;
     const w = this.w, h = this.h;
-    if (this.frame++ % 60 === 0 || !this.glowLight) this.sprites();
+    if (this.frame++ % 60 === 0 || !this.glow) this.sprites();
     const dark = this.dark;
     g.clearRect(0, 0, w, h);
     // luminous blending on the dark stage; plain blending (soft tinted bokeh) on the light one
@@ -127,21 +121,20 @@ export class Stars {
       if (s.kind === 'glow') {
         const r = s.r * (0.9 + 0.2 * tw);
         g.globalAlpha = (dark ? 0.16 : 0.11) * (0.7 + 0.3 * tw);
-        g.drawImage((s.copper ? this.glowCopper : this.glowLight)!, x - r, y - r, 2 * r, 2 * r);
+        g.drawImage(this.glow!, x - r, y - r, 2 * r, 2 * r);
       } else if (s.kind === 'star') {
         const r = s.r * (0.85 + 0.3 * tw);
         g.globalAlpha = (dark ? 0.55 : 0.32) * (0.45 + 0.55 * tw);
-        g.drawImage((s.copper ? this.starCopper : this.starLight)!, x - r, y - r, 2 * r, 2 * r);
+        g.drawImage(this.star!, x - r, y - r, 2 * r, 2 * r);
         if (s.flare) {
           // long soft flares that fade out from the core
           const len = r * 2.6 * (0.6 + 0.4 * tw);
-          const hex = s.copper ? this.copperHex : this.lightHex;
           g.globalAlpha = (dark ? 0.5 : 0.3) * tw;
           for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
             const grad = g.createLinearGradient(x - dx * len, y - dy * len, x + dx * len, y + dy * len);
-            grad.addColorStop(0, rgba(hex, 0));
-            grad.addColorStop(0.5, rgba(hex, 1));
-            grad.addColorStop(1, rgba(hex, 0));
+            grad.addColorStop(0, rgba(this.hex, 0));
+            grad.addColorStop(0.5, rgba(this.hex, 1));
+            grad.addColorStop(1, rgba(this.hex, 0));
             g.strokeStyle = grad;
             g.lineWidth = 1.2;
             g.beginPath();
@@ -153,7 +146,7 @@ export class Stars {
       } else {
         const r = s.r * (0.7 + 0.5 * tw);
         g.globalAlpha = (dark ? 0.9 : 0.45) * (0.3 + 0.7 * tw);
-        g.fillStyle = s.copper ? this.copperHex : this.lightHex;
+        g.fillStyle = this.hex;
         g.beginPath();
         g.arc(x, y, r, 0, 2 * Math.PI);
         g.fill();

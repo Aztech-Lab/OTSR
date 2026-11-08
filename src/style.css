@@ -29,8 +29,6 @@
   --shadow: 0 20px 60px rgba(30, 28, 20, 0.14);
   --vignette: 0; /* the light stage needs no fades; the dark one gets them */
   --on-copper: #fff; /* text on copper: white on the light theme, black on the dark one */
-  --glow: 17, 19, 18; /* the big fixed star behind the start screen: ink on the light stage, white on the dark one */
-  --glow-a: 0.13;
   --brand-font: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   --sans: var(--brand-font);
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
@@ -42,7 +40,7 @@
   --bg: #0f1112; --bg-2: #151819; --dot: rgba(232, 232, 226, 0.12); --ink: #f1f1ea; --text: #e2e3dc; --muted: #9ba09a; --faint: #5e635f;
   --line: #2b302f; --line-strong: #e2e3dc; --panel: rgba(21, 24, 25, 0.86); --panel-head: #e6e6df; --panel-head-text: #121413;
   --copper: #d9a25f; --copper-2: #f0c389; --copper-soft: rgba(217, 162, 95, 0.16); --solid: #e6e6df; --solid-text: #121413;
-  --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312; --glow: 255, 255, 255; --glow-a: 0.24;
+  --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -50,7 +48,7 @@
     --bg: #0f1112; --bg-2: #151819; --dot: rgba(232, 232, 226, 0.12); --ink: #f1f1ea; --text: #e2e3dc; --muted: #9ba09a; --faint: #5e635f;
     --line: #2b302f; --line-strong: #e2e3dc; --panel: rgba(21, 24, 25, 0.86); --panel-head: #e6e6df; --panel-head-text: #121413;
     --copper: #d9a25f; --copper-2: #f0c389; --copper-soft: rgba(217, 162, 95, 0.16); --solid: #e6e6df; --solid-text: #121413;
-    --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312; --glow: 255, 255, 255; --glow-a: 0.24;
+    --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312;
     color-scheme: dark;
   }
 }
@@ -91,12 +89,6 @@ a:hover { color: var(--copper); }
 .bg .r1 { width: 78vmin; height: 78vmin; right: -14vmin; top: -10vmin; border-style: dashed; animation: spin 260s linear infinite; }
 .bg .r2 { width: 46vmin; height: 46vmin; right: 2vmin; top: 6vmin; border-width: 2px; opacity: 0.18; animation: spin 180s linear infinite reverse; }
 #stars { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* the big fixed star behind the instrument: the same soft glow as the drifting ones, white on dark, ink on light, no flare */
-.bg .homeglow { left: 50%; top: 50%; width: min(960px, 118vmin); height: min(960px, 118vmin); transform: translate(-50%, -52%); border-radius: 50%; opacity: 1; transition: opacity 0.6s;
-  background: radial-gradient(circle, rgba(var(--glow), var(--glow-a)) 0, rgba(var(--glow), calc(var(--glow-a) * 0.5)) 16%, rgba(var(--glow), calc(var(--glow-a) * 0.18)) 42%, rgba(var(--glow), calc(var(--glow-a) * 0.05)) 70%, rgba(var(--glow), 0) 100%);
-  animation: breathe 9s ease-in-out infinite; }
-@keyframes breathe { 50% { transform: translate(-50%, -52%) scale(1.06); opacity: 0.86; } }
-body:not(.empty):not(.leaving) .homeglow { opacity: 0; animation: none; }
 /* more of the instrument's circle geometry, scattered over the stage: dials with ticks, reticles, orbits, brackets */
 .bg .geo { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--faint); opacity: 0.9; }
 .bg .geo .copper { stroke: var(--copper); }
@@ -477,7 +469,6 @@ dialog.modal td .key { margin-right: 4px; }
 
 @media (prefers-reduced-motion: reduce), (max-width: 960px) { .ring-spin, .ring-spin-r, .sq.blink, .frame .scan, .progress.indet i, .bg i, .bg .geo g { animation: none !important; } }
 body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink, body.no-motion .frame .scan, body.no-motion .progress.indet i, body.no-motion .bg i, body.no-motion .bg .geo g { animation: none !important; }
-body.no-motion .bg .homeglow { animation: none; }
 
 @media (max-width: 960px) {
   .brand { left: 16px; top: 16px; }
