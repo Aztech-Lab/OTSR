@@ -12,6 +12,8 @@ First public version.
   the toolbar's View menu, a shared region-of-interest tool,
   session info with the PSNR curve. Drag and drop, clipboard paste, keyboard shortcuts, persisted settings, one job
   at a time with cancel, time and memory estimates, light / dark theme.
+- Export as PNG, JPEG, WebP, AVIF (where the browser encodes it) or BMP, with a quality setting for the lossy formats;
+  notices in the status strip; one updating log line per running series (OT stages, steps, export tiles).
 - Industrial sci-fi flat design: the action at the top centre with a live fit readout, console on the left (mode
   switch, process log, collapsible), monitor on the right during fits (the three strongest-gradient regions as live
   renders), bilingual English / Traditional Chinese labels on every control,

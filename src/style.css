@@ -28,6 +28,7 @@
   --danger: #b4452f;
   --shadow: 0 20px 60px rgba(30, 28, 20, 0.14);
   --vignette: 0; /* the light stage needs no fades; the dark one gets them */
+  --on-copper: #fff; /* text on copper: white on the light theme, black on the dark one */
   --brand-font: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   --sans: var(--brand-font);
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
@@ -39,7 +40,7 @@
   --bg: #0f1112; --bg-2: #151819; --dot: rgba(232, 232, 226, 0.12); --ink: #f1f1ea; --text: #e2e3dc; --muted: #9ba09a; --faint: #5e635f;
   --line: #2b302f; --line-strong: #e2e3dc; --panel: rgba(21, 24, 25, 0.86); --panel-head: #e6e6df; --panel-head-text: #121413;
   --copper: #d9a25f; --copper-2: #f0c389; --copper-soft: rgba(217, 162, 95, 0.16); --solid: #e6e6df; --solid-text: #121413;
-  --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92;
+  --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -47,7 +48,7 @@
     --bg: #0f1112; --bg-2: #151819; --dot: rgba(232, 232, 226, 0.12); --ink: #f1f1ea; --text: #e2e3dc; --muted: #9ba09a; --faint: #5e635f;
     --line: #2b302f; --line-strong: #e2e3dc; --panel: rgba(21, 24, 25, 0.86); --panel-head: #e6e6df; --panel-head-text: #121413;
     --copper: #d9a25f; --copper-2: #f0c389; --copper-soft: rgba(217, 162, 95, 0.16); --solid: #e6e6df; --solid-text: #121413;
-    --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92;
+    --ok: #8fbf7a; --danger: #e8745a; --shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --vignette: 0.92; --on-copper: #111312;
     color-scheme: dark;
   }
 }
@@ -78,17 +79,16 @@ a:hover { color: var(--copper); }
 .bi small { margin-top: 3px; font: 500 9px/1 var(--sans); letter-spacing: 0.18em; opacity: 0.72; }
 .zh { font-family: var(--sans); letter-spacing: 0.18em; text-transform: none; }
 
-/* ---- stage: the dot field under frosted glass, the drifting grid and rings, the canvases (clipped to the image) --- */
+/* ---- stage: the dot grid, the drifting lines and rings, floating starlight, the canvases (clipped to the image) ---- */
 #stage { position: fixed; inset: 0; background: var(--bg); }
+#stage::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(var(--dot) 1px, transparent 1.2px); background-size: 22px 22px; background-position: 11px 11px; pointer-events: none; }
 .bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .bg i { position: absolute; display: block; }
 .bg .grid { inset: -200px; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 176px 176px; opacity: 0.38; animation: bgdrift 70s linear infinite; }
 .bg .ring { border-radius: 50%; border: 1px solid var(--faint); opacity: 0.35; }
 .bg .r1 { width: 78vmin; height: 78vmin; right: -14vmin; top: -10vmin; border-style: dashed; animation: spin 260s linear infinite; }
 .bg .r2 { width: 46vmin; height: 46vmin; right: 2vmin; top: 6vmin; border-width: 2px; opacity: 0.18; animation: spin 180s linear infinite reverse; }
-/* the dot canvas is blurred and covered by a milky layer; the grid and the rings above it stay crisp */
-#bgfield { position: absolute; inset: 0; width: 100%; height: 100%; filter: blur(5px); }
-.bg .frost { inset: 0; background: color-mix(in srgb, var(--bg) 35%, transparent); }
+#stars { position: absolute; inset: 0; width: 100%; height: 100%; }
 @keyframes bgdrift { to { transform: translate(176px, 176px); } }
 #view, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #view { touch-action: none; }
@@ -102,14 +102,16 @@ body.left-closed .vignette { background: linear-gradient(180deg, var(--bg) 0, tr
 .float { position: fixed; z-index: 10; }
 
 /* ---- brand (top left; centred on the empty screen, slides left when an image enters) ----------------------------- */
-.brand { left: 40px; top: 34px; user-select: none; color: var(--ink); transition: left 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
-body.empty .brand { left: 50%; transform: translateX(-50%); }
+.brand { left: 40px; top: 34px; user-select: none; color: var(--ink); cursor: pointer; transition: left 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+body.empty .brand { left: 50%; transform: translateX(-50%); cursor: default; }
+.brand h1 { transition: color 0.15s; }
+body:not(.empty) .brand:hover h1 { color: var(--copper); }
 body.empty .brand .row1, body.empty .brand .row2 { justify-content: center; }
 body.entering .brand { animation: brandIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes brandIn { from { left: 50%; transform: translateX(-50%); } }
 .brand .row1 { display: flex; align-items: center; gap: 14px; }
 .brand h1 { margin: 0; font: 900 44px/1 var(--brand-font); letter-spacing: 0.1em; }
-.brand .badge { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: var(--copper); color: #fff; font: 700 10px/1 var(--mono); letter-spacing: 0.16em; clip-path: var(--chamfer-sm); }
+.brand .badge { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: var(--copper); color: var(--on-copper); font: 700 10px/1 var(--mono); letter-spacing: 0.16em; clip-path: var(--chamfer-sm); }
 .brand .row2 { margin-top: 8px; display: flex; gap: 14px; align-items: center; }
 .brand .row2 .micro { color: var(--text); }
 .barcode { width: 92px; height: 12px; background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px, var(--ink) 4px 5px, transparent 5px 8px, var(--ink) 8px 11px, transparent 11px 13px); opacity: 0.85; }
@@ -120,7 +122,7 @@ body.entering .brand { animation: brandIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) bo
 .navbtn:hover { color: var(--copper); border-color: var(--copper); background: var(--copper-soft); }
 .navbtn.on { color: var(--copper); }
 .themebtn { display: inline-flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px 0 12px; background: var(--solid); color: var(--solid-text); clip-path: var(--chamfer-sm); transition: background 0.15s, color 0.15s; }
-.themebtn:hover { background: var(--copper); color: #fff; }
+.themebtn:hover { background: var(--copper); color: var(--on-copper); }
 .themebtn .ico { font-size: 18px; line-height: 1; }
 .themebtn .two { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .themebtn .two b { font: 700 10.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
@@ -147,7 +149,7 @@ body.entering .brand { animation: brandIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) bo
 /* the joined pair: Load sample (pale) on the left, Open image (copper) on the right */
 .pair { display: inline-flex; gap: 0; }
 .pair .btn { height: 46px; }
-.pair .btn.pale { background: #fff; color: var(--ink); border-color: transparent; clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+.pair .btn.pale { background: #fff; color: #111312; border-color: transparent; clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
 .pair .btn.pale:hover:not(:disabled) { background: var(--copper-soft); }
 .pair .btn.copper { clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
 .pair .btn.pale[hidden] + .btn.copper { clip-path: var(--chamfer-sm); }
@@ -172,10 +174,10 @@ body.entering .instrument .ring-spin-r { animation: spin 0.7s cubic-bezier(0.4, 
 body.entering #view { animation: iris 0.85s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s both; }
 @keyframes iris { from { clip-path: inset(50% 50% 50% 50%); } }
 body.entering .frame i { animation: bracket 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s both; }
-body.entering .frame i:nth-child(1) { --dx: -48px; --dy: -48px; }
-body.entering .frame i:nth-child(2) { --dx: 48px; --dy: -48px; }
-body.entering .frame i:nth-child(3) { --dx: -48px; --dy: 48px; }
-body.entering .frame i:nth-child(4) { --dx: 48px; --dy: 48px; }
+.frame i:nth-child(1) { --dx: -48px; --dy: -48px; }
+.frame i:nth-child(2) { --dx: 48px; --dy: -48px; }
+.frame i:nth-child(3) { --dx: -48px; --dy: 48px; }
+.frame i:nth-child(4) { --dx: 48px; --dy: 48px; }
 @keyframes bracket { from { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
 body.entering .frame .scan { display: block !important; animation: scan 0.9s cubic-bezier(0.4, 0, 0.6, 1) 0.55s 1 both; }
 body.entering .frame .tag { animation: fadein 0.5s 1.1s both; }
@@ -187,12 +189,33 @@ body.entering .zoombar, body.entering .statusbar .cursor, body.entering .bookmar
 @keyframes fadein { from { opacity: 0; } }
 body.no-motion.entering *, body.no-motion.entering { animation: none !important; }
 
+/* ---- leaving the canvas (the wordmark, Home): the same transition backwards, then the instrument returns ------------ */
+body.leaving #view { animation: irisOut 0.55s cubic-bezier(0.6, 0, 0.9, 0.4) 0.1s both; }
+@keyframes irisOut { to { clip-path: inset(50% 50% 50% 50%); } }
+body.leaving .frame i { animation: bracketOut 0.5s cubic-bezier(0.6, 0, 0.9, 0.4) both; }
+@keyframes bracketOut { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+body.leaving .frame .scan { display: block !important; animation: scan 0.6s cubic-bezier(0.4, 0, 0.6, 1) reverse both; }
+body.leaving .frame .tag, body.leaving .zoombar, body.leaving .statusbar .cursor, body.leaving .bookmark, body.leaving .result-hud, body.leaving .monitor, body.leaving .paneltab, body.leaving .statusbar .notice { animation: fadeout 0.35s both; }
+@keyframes fadeout { to { opacity: 0; } }
+body.leaving .console { animation: slideLout 0.5s cubic-bezier(0.6, 0, 0.9, 0.4) both; }
+@keyframes slideLout { to { transform: translateX(-36px); opacity: 0; } }
+body.leaving .command { animation: slideTout 0.5s cubic-bezier(0.6, 0, 0.9, 0.4) both; }
+@keyframes slideTout { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -24px); opacity: 0; } }
+body.leaving .brand { left: 50%; transform: translateX(-50%); }
+body.leaving .brand .row1, body.leaving .brand .row2 { justify-content: center; }
+body.arriving .instrument { animation: arrive 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes arrive { from { transform: translate(-50%, -52%) scale(0.1) rotate(-70deg); opacity: 0; } }
+body.arriving .instrument .ring-spin { animation: spin 0.75s cubic-bezier(0, 0, 0.4, 1) reverse both; }
+body.arriving .instrument .ring-spin-r { animation: spin 0.75s cubic-bezier(0, 0, 0.4, 1) both; }
+body.arriving .bootlog { animation: fadein 0.5s 0.5s both; }
+body.no-motion.leaving *, body.no-motion.arriving * { animation: none !important; }
+
 /* ---- buttons: everything clickable has an edge, a fill on hover, or both ----------------------------------------- */
 .btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; height: 44px; padding: 0 16px; border: 1px solid var(--line-strong); color: var(--ink); clip-path: var(--chamfer-sm); transition: background 0.15s, color 0.15s; }
 .btn:hover:not(:disabled) { background: var(--copper-soft); }
 .btn.solid { background: var(--solid); color: var(--solid-text); border-color: transparent; }
-.btn.solid:hover:not(:disabled) { background: var(--copper); color: #fff; }
-.btn.copper { background: var(--copper); color: #fff; border-color: transparent; }
+.btn.solid:hover:not(:disabled) { background: var(--copper); color: var(--on-copper); }
+.btn.copper { background: var(--copper); color: var(--on-copper); border-color: transparent; }
 .btn.copper:hover:not(:disabled) { background: var(--copper-2); }
 .btn.big { width: 100%; height: 52px; }
 .btn.big .bi b { font-size: 12px; }
@@ -219,7 +242,7 @@ body.left-closed .console { display: none; }
 .console-head > span:first-child { white-space: nowrap; }
 .console-body { flex: 1; overflow-y: auto; padding: 14px 20px 18px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 /* the bookmarks that collapse the panels: on the console's right edge and the monitor's left edge, mid-height */
-.bookmark { z-index: 11; top: 50%; width: 20px; height: 72px; display: grid; place-items: center; background: var(--copper); color: #fff; font: 300 16px/1 var(--mono); box-shadow: var(--shadow); transition: background 0.15s, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.3s; }
+.bookmark { z-index: 11; top: 50%; width: 20px; height: 72px; display: grid; place-items: center; background: var(--copper); color: var(--on-copper); font: 300 16px/1 var(--mono); box-shadow: var(--shadow); transition: background 0.15s, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.3s; }
 .bookmark i { font-style: normal; }
 .bookmark:hover { background: var(--copper-2); }
 .bookmark.left { left: 440px; transform: translateY(-50%); clip-path: polygon(0 0, 100% 7px, 100% calc(100% - 7px), 0 100%); }
@@ -311,6 +334,14 @@ select option { background: var(--bg); }
 .spark polyline { fill: none; stroke: var(--copper); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 .spark.big { height: 56px; margin-top: 12px; border: 1px solid var(--line); background: var(--bg-2); }
 
+/* the export control: a split button (format name + menu arrow) and the format menu below it */
+.exportwrap { position: relative; margin-top: 12px; }
+.splitbtn { display: flex; gap: 2px; }
+.splitbtn .btn.big { flex: 1; clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+.splitbtn .btn.menu { width: 44px; height: 52px; padding: 0; justify-content: center; font: 400 16px/1 var(--mono); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+.exportmenu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 6; padding: 12px 14px 14px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); }
+.exportmenu .range { margin-top: 12px; }
+
 /* monitor cards: one column, a live crop, its letter, position and gradient bar */
 .roi-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .roi-card { opacity: 1; transition: opacity 0.3s; min-width: 0; }
@@ -399,13 +430,15 @@ body:not(.busy) .frame .scan, body.fitshow .frame .scan { display: none; }
 .card p { color: var(--muted); line-height: 1.7; }
 .card .btn { display: inline-flex; }
 body.busy #view { cursor: progress; }
-#toasts { position: fixed; bottom: 136px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 50; width: min(460px, calc(100vw - 40px)); }
-.toast { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--copper); box-shadow: var(--shadow); font: 500 11.5px/1.5 var(--mono); clip-path: var(--chamfer-sm); animation: toastin 0.25s ease-out; }
-@keyframes toastin { from { transform: translateY(12px); opacity: 0; } }
-.toast.success { border-left-color: var(--ok); }
-.toast.error { border-left-color: var(--danger); }
-.toast .msg { flex: 1; }
-.toast .close { color: var(--muted); }
+/* notifications: a chip in the middle of the status strip */
+.statusbar .notice { position: absolute; left: 50%; top: 2px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 10px; max-width: 44%; padding: 5px 10px 5px 12px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--copper); box-shadow: var(--shadow); font: 500 10.5px/1.4 var(--mono); letter-spacing: 0.04em; text-transform: none; color: var(--text); clip-path: var(--chamfer-sm); animation: noticein 0.25s ease-out; }
+@keyframes noticein { from { transform: translate(-50%, 8px); opacity: 0; } }
+.statusbar .notice.success { border-left-color: var(--ok); }
+.statusbar .notice .msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.statusbar .notice .close { font: 400 14px/1 var(--mono); color: var(--muted); }
+.statusbar .notice .close:hover { color: var(--copper); }
+.statusbar.has-notice .fill { max-width: 26%; }
+.statusbar .seg-count { margin-left: auto; }
 dialog.modal { padding: 0; width: min(760px, calc(100vw - 40px)); max-height: calc(100vh - 60px); background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow); clip-path: var(--chamfer); }
 dialog.modal::backdrop { background: rgba(10, 12, 11, 0.35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 dialog.modal .console-head { position: sticky; top: 0; padding-left: 18px; }
@@ -432,7 +465,7 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
 @media (max-width: 960px) {
   .brand { left: 16px; top: 16px; }
   .brand h1 { font-size: 28px; }
-  .brand .row2, .navbtn .bi, .result-hud, .zoombar .val, .statusbar .right, .frame .tag, .bootlog, .paneltab, .monitor, .bookmark, .themebtn .two { display: none; }
+  .brand .row2, .navbtn .bi, .result-hud, .zoombar .val, .statusbar .right, .frame .tag, .bootlog, .paneltab, .monitor, .bookmark, .themebtn .two, .statusbar .notice { display: none; }
   .sysnav { right: 16px; top: 22px; gap: 12px; }
   .navbtn, .themebtn { height: 30px; padding: 0 10px; }
   .console { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 50vh; }

@@ -7,7 +7,7 @@ import { fmtBytes, fmtInt, fmtSeconds } from './dom';
 import type { FitShow } from './fitshow';
 import type { Monitor } from './monitor';
 import type { VectorView } from './vectorview';
-import { MAX_PIXELS, WARN_PIXELS, decodeImageFile, downloadBlob, encodePng, imageFromRgba8, stem, type LoadedImage } from './image';
+import { EXPORT_FORMATS, MAX_PIXELS, WARN_PIXELS, decodeImageFile, downloadBlob, encodeImage, imageFromRgba8, stem, type ExportFormat, type LoadedImage } from './image';
 import type { JobRunner } from './jobs';
 import { effectiveSettings, gaussianCount } from './presets';
 import { defaultRoi } from './roi';
@@ -138,7 +138,7 @@ export class Actions {
           },
           onStage: (T, k, n, eps, grid) => {
             show?.otStage(T, grid);
-            progress(-1, `OT ε-scaling stage ${k + 1} / ${n} · ε = ${eps.toExponential(1)}`);
+            progress(-1, `OT ε-scaling stage ${k + 1} / ${n} · ε = ${eps.toExponential(1)}`, 'ot');
           },
         });
         show?.otDone();
@@ -170,7 +170,7 @@ export class Actions {
           onProgress: (p) => {
             const rate = p.step / Math.max(1e-3, p.elapsedMs / 1000);
             const left = p.step > 0 ? (p.steps - p.step) / rate : NaN;
-            progress(p.step / p.steps, `Step ${fmtInt(p.step)} / ${fmtInt(p.steps)} · ${p.psnr.toFixed(2)} dB · ${rate.toFixed(0)} it/s${p.step > 0 ? ` · ~${fmtSeconds(left)} left` : ''}`, true);
+            progress(p.step / p.steps, `Step ${fmtInt(p.step)} / ${fmtInt(p.steps)} · ${p.psnr.toFixed(2)} dB · ${rate.toFixed(0)} it/s${p.step > 0 ? ` · ~${fmtSeconds(left)} left` : ''}`, 'step');
             s.set({ live: { step: p.step, steps: p.steps, psnr: p.psnr, rate, left }, curve: [...s.state.curve, { step: p.step, psnr: p.psnr }] });
             this.viewer.requestRender();
           },
@@ -276,7 +276,8 @@ export class Actions {
 
   // ---- export --------------------------------------------------------------------------------------------------
 
-  async exportPng(scale = this.store.state.prefs.scale): Promise<void> {
+  /** Renders the model at `scale` and downloads it as `format` (the chosen one by default; PNG when the browser cannot encode it). */
+  async exportImage(format: ExportFormat = this.store.state.prefs.exportFormat ?? 'png', scale = this.store.state.prefs.scale): Promise<void> {
     const s = this.store;
     const m = s.state.model;
     if (!m) return void toast('Fit a model first.', 'info', 3000);
@@ -284,21 +285,38 @@ export class Actions {
     const W = Math.round(m.W * scale);
     const H = Math.round(m.H * scale);
     if (W > 16384 || H > 16384 || W * H > 120e6) return void toast(`${W} × ${H} is too large to encode in the browser (max 16384 per side, 120 MP). Choose a smaller scale.`, 'error');
-    const { edges, edgePx } = s.state.prefs;
+    const { edges, edgePx, exportQuality } = s.state.prefs;
+    const info = EXPORT_FORMATS.find((f) => f.key === format) ?? EXPORT_FORMATS[0];
     await this.jobs.run('Export', async ({ signal, progress }) => {
       const t0 = performance.now();
       const img = await renderImage(this.ctx, this.pipes, m.params, m.N, m.W, m.H, scale, {
         edges, edge: { edgePx }, signal,
-        onProgress: (d, t) => progress(d / (t + 1), `Rendering ${W} × ${H} — tile ${d} / ${t}`, true),
+        onProgress: (d, t) => progress(d / (t + 1), `Rendering ${W} × ${H} — tile ${d} / ${t}`, 'tiles'),
       });
-      progress(0.95, `Encoding PNG (${W} × ${H}) …`);
-      const blob = await encodePng(img.rgba, img.width, img.height);
-      const name = `${stem(s.state.image?.name ?? String(m.meta.source ?? 'model'))}_otsr_x${scale}${edges ? '' : '_raw'}.png`;
-      downloadBlob(blob, name);
+      progress(0.95, `Encoding ${info.label} (${W} × ${H})${info.lossy ? ` · quality ${Math.round((exportQuality ?? 0.92) * 100)}` : ''} …`);
+      const enc = await encodeImage(img.rgba, img.width, img.height, info.key, exportQuality ?? 0.92);
+      const name = `${stem(s.state.image?.name ?? String(m.meta.source ?? 'model'))}_otsr_x${scale}${edges ? '' : '_raw'}.${enc.ext}`;
+      downloadBlob(enc.blob, name);
       m.saved = true;
-      s.setStatus(`Exported ${name} (${(blob.size / 1e6).toFixed(1)} MB) in ${fmtSeconds((performance.now() - t0) / 1000)}.`);
-      toast(`Exported ${name}`, 'success');
+      s.setStatus(`Exported ${name} (${(enc.blob.size / 1e6).toFixed(1)} MB) in ${fmtSeconds((performance.now() - t0) / 1000)}.`);
+      if (enc.fallback) toast(`${info.label} is not supported by this browser — saved as PNG instead.`, 'info', 6000);
+      else toast(`Exported ${name}`, 'success');
     });
+  }
+
+  /** Back to the start screen: drops the model and the image and clears everything that belonged to them. */
+  reset(): void {
+    const s = this.store;
+    this.vectorView?.release();
+    this.dropModel();
+    s.state.sourceBuf?.destroy();
+    this.viewer.setSource(null);
+    this.viewer.roi.set(null);
+    this.viewer.layers = { gaussians: false, error: false, vector: false, ot: false };
+    this.viewer.markers = [];
+    this.viewer.mode = 'bicubic';
+    s.set({ image: null, sourceBuf: null, roi: null, lastFit: null, curve: [], live: null, regions: [], monitor: false, log: [], layers: { gaussians: false, error: false, vector: false, ot: false }, viewMode: 'bicubic', errorStats: null, fitEntries: 0, tool: 'pan' });
+    s.setStatus('');
   }
 
   saveModel(): void {

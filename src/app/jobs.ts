@@ -5,8 +5,11 @@ import { toast } from './toast';
 
 export interface JobContext {
   signal: AbortSignal;
-  /** Reports progress; `inplace` lines replace the previous in-place line instead of adding to the log (step counters). */
-  progress: (fraction: number, text: string, inplace?: boolean) => void;
+  /**
+   * Reports progress. Lines with a `series` key replace the previous line of the same series instead of adding to
+   * the log — step counters, OT stages, export tiles — so each running series takes one line that keeps updating.
+   */
+  progress: (fraction: number, text: string, series?: string) => void;
 }
 
 const LOG_KEEP = 14;
@@ -31,15 +34,15 @@ export class JobRunner {
       return undefined;
     }
     const controller = new AbortController();
-    let lastInplace = false;
-    const progress = (fraction: number, text: string, inplace = false) => {
+    let lastSeries: string | null = null;
+    const progress = (fraction: number, text: string, series?: string) => {
       const log = this.store.state.log;
       let next = log;
       if (text) {
-        if (inplace && lastInplace && log.length) next = [...log.slice(0, -1), text];
+        if (series && lastSeries === series && log.length) next = [...log.slice(0, -1), text];
         else if (text !== log[log.length - 1]) next = [...log.slice(-(LOG_KEEP - 1)), text];
+        lastSeries = series ?? null;
       }
-      lastInplace = inplace && !!text;
       this.store.set({ job: { name, fraction, text, cancel: () => controller.abort() }, log: next });
     };
     this.store.set({ log: [] });

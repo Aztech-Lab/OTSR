@@ -4,7 +4,7 @@
 import { acquireDevice, createPipelines, renderImage, type GpuContext, type Pipelines } from '../engine';
 import { encodeOtsr } from '../core/fileformat';
 import { Actions } from './actions';
-import { BgField } from './bgfield';
+import { Stars } from './stars';
 import { bi, fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
 import { FitShow } from './fitshow';
 import { JobRunner } from './jobs';
@@ -156,7 +156,7 @@ async function boot(): Promise<void> {
 
   const viewer = new Viewer($('view'), $('overlay'), ctx, pipes, $('stage')); // pointer events on the whole stage
   const view = $('view');
-  new BgField($<HTMLCanvasElement>('bgfield'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches);
+  new Stars($<HTMLCanvasElement>('stars'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches);
   const zoombar = $('toolbar');
   // keep the fitted image clear of the console (left), the monitor (right), the command block (top) and the bottom bars
   const setInsets = () => {
@@ -309,6 +309,37 @@ async function boot(): Promise<void> {
     }
   });
 
+  // the wordmark: back to the start screen with the entering transition played backwards (body.leaving, then .arriving)
+  let leaving = false;
+  const goHome = async () => {
+    if (leaving || (!store.state.image && !store.state.model)) return;
+    leaving = true;
+    try {
+      if (store.state.job) {
+        jobs.cancel();
+        await new Promise<void>((resolve) => { const off = store.subscribe((s) => { if (!s.job) { off(); resolve(); } }); });
+      }
+      const motionOn = store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.body.classList.remove('entering');
+      document.body.classList.add('leaving');
+      if (motionOn) await new Promise((r) => setTimeout(r, 720));
+      actions.reset();
+      document.body.classList.remove('leaving');
+      if (motionOn) {
+        document.body.classList.add('arriving');
+        setTimeout(() => document.body.classList.remove('arriving'), 900);
+      }
+    } finally {
+      leaving = false;
+    }
+  };
+  goHomeRef = goHome;
+  $('brand').addEventListener('click', () => void goHome());
+  window.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement | null;
+    if (e.key === 'Home' && !(t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'))) { e.preventDefault(); void goHome(); }
+  });
+
   // panels: the console collapses to a tab on the left; the monitor opens during fits and from a tab on the right
   $('console-bookmark').addEventListener('click', () => store.setPrefs({ panelLeft: false }));
   $('left-tab').addEventListener('click', () => store.setPrefs({ panelLeft: true }));
@@ -439,7 +470,8 @@ function api(store: Store, actions: Actions, viewer: Viewer, ctx: GpuContext, pi
       await actions.fit();
       return store.state.lastFit;
     },
-    export: (scale?: number) => actions.exportPng(scale),
+    export: (scale?: number, format?: 'png' | 'jpeg' | 'webp' | 'avif' | 'bmp') => actions.exportImage(format, scale),
+    home: () => goHomeRef?.(),
     render: (S: number, edges = true) => {
       const m = store.state.model;
       return m ? renderImage(ctx, pipes, m.params, m.N, m.W, m.H, S, { edges }) : Promise.reject(new Error('no model'));
@@ -464,5 +496,7 @@ function api(store: Store, actions: Actions, viewer: Viewer, ctx: GpuContext, pi
     store,
   };
 }
+
+let goHomeRef: (() => Promise<void>) | null = null;
 
 void boot();

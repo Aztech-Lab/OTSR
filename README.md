@@ -37,7 +37,7 @@ Android; Safari 26+ on macOS / iOS — and a GPU. Integrated GPUs work; a discre
    Gaussians growing into a watercolour, a scan line revealing the result; a monitor shows the regions changing most.
    The **Research** mode exposes every parameter (budget, steps, edge width, L1 / L2 loss) and the analysis tools
    (Gaussian outlines, error map, region of interest, PSNR curve).
-4. **Export PNG** at 1× to 16× or any scale, or **Save .otsr** to keep the model (a few MB; re-renderable at any
+4. **Export** as PNG, JPEG, WebP, AVIF or BMP at 1× to 16× or any scale, or **Save .otsr** to keep the model (a few MB; re-renderable at any
    size later with **Load .otsr**).
 
 See [docs/getting-started.md](docs/getting-started.md) for the details and

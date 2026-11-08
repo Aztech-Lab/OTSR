@@ -43,9 +43,11 @@ The switch in the header picks the mode; the choice and every setting are rememb
 3. **Enhance** — the copper button at the top centre (`F` or Enter). While it runs, the button becomes a live
    readout: step, PSNR, iterations per second, time left and the PSNR curve; *Stop* (or Esc) keeps what has been
    fitted so far. Then **Export** at 1×, 2×, 4×, 8×, 16× or any factor (the output size is shown under each choice)
-   as PNG, JPEG, WebP or AVIF — the ▾ next to the button picks the format (AVIF only where the browser can encode it;
-   otherwise the file is saved as PNG and you are told) — or **Save model** (`.otsr`, 36 bytes per Gaussian) to
-   re-open later with *Load model…* without a new fit. Clicking the **OTSR** wordmark returns to the start screen.
+   as PNG, JPEG, WebP, AVIF or BMP — the ▾ next to the button opens the format menu with a quality slider for the
+   lossy formats; a format this browser cannot encode is greyed out (AVIF in most browsers today) — or **Save model**
+   (`.otsr`, 36 bytes per Gaussian) to re-open later with *Load model…* without a new fit. Clicking the **OTSR**
+   wordmark (or pressing Home) returns to the start screen — the entering transition played backwards — and drops
+   the image and the model.
 
 While the fit runs the view plays the process itself (*Fit animation* in the settings): the uniform lattice, then the
 real stages of the optimal-transport initialisation (the barycentric map after every ε-scaling stage of the Sinkhorn
@@ -55,7 +57,8 @@ engine from the parameters the optimiser is changing, growing from points, each 
 left to right gives every Gaussian its true colour back. A **monitor** panel slides in from the right with the three regions of the image with the
 strongest gradient (chosen when the fit starts), each as a live render — in Gaussian-id colours while the fit runs,
 in true colours afterwards; it closes when the fit ends and reopens from the tab on the right edge. The console on the left logs the real steps (density, Sinkhorn stages, upload, optimisation, readback, edge
-pass); the copper bookmark on a panel's inner edge collapses it.
+pass) — a running series such as the OT stages or the step counter keeps updating one line; the copper bookmark on a
+panel's inner edge collapses it.
 
 After the fit the view shows a **split comparison**: bicubic interpolation of the original on the left of the divider,
 OTSR on the right. Drag the divider, zoom in (wheel, `+`/`−`, the toolbar) and pan (drag) to inspect; press `0` to fit
@@ -66,8 +69,9 @@ figure of the paper), the **OT lattice** of the initialisation over the image (`
 the **error map** (`D`). Pixel rulers
 run along the top and left edge of the image and the status strip shows the source pixel under the cursor. The canvas
 is clipped to the image, so the slowly moving stage shows around it when zoomed out. The *GPU mem* readout is an
-estimate from the engine's allocations before the fit and the allocated figure afterwards. Errors open a dialog; the
-status strip keeps the last message. The light / dark button sits at the top right; *System* follows the OS theme.
+estimate from the engine's allocations before the fit and the allocated figure afterwards. Errors open a dialog; other
+notices show as a chip in the middle of the status strip, which also keeps the last status message. The light / dark
+button sits at the top right; *System* follows the OS theme.
 
 **Research** — the same workflow with every parameter exposed and the analysis tools:
 

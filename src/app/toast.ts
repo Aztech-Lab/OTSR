@@ -1,27 +1,31 @@
-// Transient notifications (top right). Errors stay until dismissed; everything else fades after a few seconds.
+// Notifications: errors open the alert dialog (#alert in index.html); everything else shows as a chip in the middle
+// of the status strip (#notice) and fades after a few seconds.
 
-import { h, icon } from './dom';
-
-let host: HTMLElement | null = null;
-
-function container(): HTMLElement {
-  if (!host) {
-    host = h('div', { id: 'toasts', role: 'status', 'aria-live': 'polite' });
-    document.body.appendChild(host);
-  }
-  return host;
-}
+import { h } from './dom';
 
 export type ToastKind = 'info' | 'success' | 'error';
 
-/** Errors open the alert dialog (#alert in index.html); everything else is a toast that fades after `ms`. */
+let timer = 0;
+
+function hide(): void {
+  const host = document.getElementById('notice');
+  if (!host) return;
+  host.hidden = true;
+  host.parentElement?.classList.remove('has-notice');
+}
+
 export function toast(message: string, kind: ToastKind = 'info', ms = 5000): void {
   if (kind === 'error') return showAlert(message);
-  const el = h('div', { class: `toast ${kind}` }, h('span', { class: 'msg' }, message));
-  const close = h('button', { class: 'close', title: 'Dismiss', onClick: () => el.remove() }, icon('x', 14));
-  el.appendChild(close);
-  container().appendChild(el);
-  if (ms > 0) setTimeout(() => el.remove(), ms);
+  const host = document.getElementById('notice');
+  if (!host) { console.info(message); return; }
+  host.hidden = true; // restart the entrance animation
+  host.className = `notice ${kind}`;
+  host.replaceChildren(h('span', { class: 'msg', title: message }, message), h('button', { class: 'close', title: 'Dismiss · 關閉', onClick: hide }, '×'));
+  void host.offsetWidth;
+  host.hidden = false;
+  host.parentElement?.classList.add('has-notice');
+  clearTimeout(timer);
+  if (ms > 0) timer = window.setTimeout(hide, ms);
 }
 
 /** The error popup: one modal dialog, new messages are appended while it is open; OK / Esc close it. */

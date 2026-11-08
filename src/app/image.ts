@@ -60,6 +60,92 @@ export async function encodePng(rgba: Uint8ClampedArray<ArrayBuffer>, W: number,
   return canvas.convertToBlob({ type: 'image/png' });
 }
 
+// ---- export formats --------------------------------------------------------------------------------------------
+
+export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'avif' | 'bmp';
+
+export interface ExportFormatInfo {
+  key: ExportFormat;
+  label: string;
+  ext: string;
+  mime: string;
+  /** Takes a quality setting. */
+  lossy: boolean;
+}
+
+/** The formats offered by the export menu; the browser's encoder does all but BMP (written by hand). */
+export const EXPORT_FORMATS: readonly ExportFormatInfo[] = [
+  { key: 'png', label: 'PNG', ext: 'png', mime: 'image/png', lossy: false },
+  { key: 'jpeg', label: 'JPEG', ext: 'jpg', mime: 'image/jpeg', lossy: true },
+  { key: 'webp', label: 'WebP', ext: 'webp', mime: 'image/webp', lossy: true },
+  { key: 'avif', label: 'AVIF', ext: 'avif', mime: 'image/avif', lossy: true },
+  { key: 'bmp', label: 'BMP', ext: 'bmp', mime: 'image/bmp', lossy: false },
+];
+
+const support = new Map<ExportFormat, Promise<boolean>>();
+
+/** Whether this browser can encode the format (a 1 x 1 probe; the result is cached). */
+export function canEncode(format: ExportFormat): Promise<boolean> {
+  let p = support.get(format);
+  if (!p) {
+    p = (async () => {
+      if (format === 'png' || format === 'bmp') return true;
+      try {
+        const info = EXPORT_FORMATS.find((f) => f.key === format)!;
+        const c = new OffscreenCanvas(1, 1);
+        c.getContext('2d')!.fillRect(0, 0, 1, 1);
+        const b = await c.convertToBlob({ type: info.mime, quality: 0.9 });
+        return b.type === info.mime;
+      } catch {
+        return false;
+      }
+    })();
+    support.set(format, p);
+  }
+  return p;
+}
+
+/** Uncompressed 24-bit BMP (bottom-up rows padded to 4 bytes; alpha dropped). */
+export function encodeBmp(rgba: Uint8ClampedArray, W: number, H: number): Blob {
+  const rowBytes = (W * 3 + 3) & ~3;
+  const size = 54 + rowBytes * H;
+  const buf = new ArrayBuffer(size);
+  const v = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  v.setUint8(0, 0x42); v.setUint8(1, 0x4d); // BM
+  v.setUint32(2, size, true); v.setUint32(10, 54, true);
+  v.setUint32(14, 40, true); v.setInt32(18, W, true); v.setInt32(22, H, true);
+  v.setUint16(26, 1, true); v.setUint16(28, 24, true); v.setUint32(34, rowBytes * H, true);
+  v.setInt32(38, 2835, true); v.setInt32(42, 2835, true); // 72 dpi
+  for (let y = 0; y < H; y++) {
+    const dst = 54 + (H - 1 - y) * rowBytes;
+    const src = y * W * 4;
+    for (let x = 0; x < W; x++) {
+      u8[dst + 3 * x] = rgba[src + 4 * x + 2];
+      u8[dst + 3 * x + 1] = rgba[src + 4 * x + 1];
+      u8[dst + 3 * x + 2] = rgba[src + 4 * x];
+    }
+  }
+  return new Blob([buf], { type: 'image/bmp' });
+}
+
+/**
+ * Encodes 8-bit RGBA in the chosen format (quality 0..1 for the lossy ones). If the browser cannot encode the format
+ * the result is a PNG and `fallback` is true.
+ */
+export async function encodeImage(rgba: Uint8ClampedArray<ArrayBuffer>, W: number, H: number, format: ExportFormat, quality = 0.92): Promise<{ blob: Blob; ext: string; fallback: boolean }> {
+  const info = EXPORT_FORMATS.find((f) => f.key === format) ?? EXPORT_FORMATS[0];
+  if (info.key === 'bmp') return { blob: encodeBmp(rgba, W, H), ext: 'bmp', fallback: false };
+  if (info.key === 'png') return { blob: await encodePng(rgba, W, H), ext: 'png', fallback: false };
+  const canvas = new OffscreenCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D canvas unavailable');
+  ctx.putImageData(new ImageData(rgba, W, H), 0, 0);
+  const blob = await canvas.convertToBlob({ type: info.mime, quality: Math.max(0.05, Math.min(1, quality)) });
+  if (blob.type !== info.mime) return { blob: await canvas.convertToBlob({ type: 'image/png' }), ext: 'png', fallback: true };
+  return { blob, ext: info.ext, fallback: false };
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

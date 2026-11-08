@@ -5,6 +5,7 @@
 import { EDGE_PX } from '../core/spec';
 import type { Actions, SampleEntry } from './actions';
 import { bi, fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
+import { EXPORT_FORMATS, canEncode, type ExportFormat } from './image';
 import { effectiveSettings, fitMemoryBytes, fitSecondsEstimate, gaussianCount, viewMemoryBytes } from './presets';
 import type { AppState, Loss, Mode, Preset, Store, ViewMode } from './store';
 import type { Viewer } from './viewer';
@@ -139,17 +140,37 @@ export class Panel {
       else { s.setPrefs({ scale: v }); customScale.hidden = true; }
     }, 'tight');
     customScale.hidden = SCALES.includes(s.state.prefs.scale);
-    const exportBtn = h('button', { class: 'btn solid big', style: 'margin-top:12px', onClick: () => void a.exportPng() }, bi('Export PNG', '匯出 PNG'), h('span', { class: 'arrow' }, '↓'));
+    // the export control: the button exports in the chosen format, the arrow opens the format menu
+    const exportLabel = h('span', { class: 'bi' });
+    const exportBtn = h('button', { class: 'btn solid big', onClick: () => void a.exportImage() }, exportLabel, h('span', { class: 'arrow' }, '↓'));
+    const exportMenu = h('div', { class: 'exportmenu', hidden: true });
+    const menuBtn = h('button', { class: 'btn solid menu', title: 'Export format · 匯出格式', onClick: () => { exportMenu.hidden = !exportMenu.hidden; } }, '▾');
+    const formats = this.choices(EXPORT_FORMATS.map((f) => [f.key, f.label, f.lossy ? 'lossy' : 'lossless'] as const), (st) => st.prefs.exportFormat ?? 'png', (k) => s.setPrefs({ exportFormat: k }), 'tight');
+    const quality = this.rangeField('Quality', '品質', 'exportQuality', 0.5, 1, 0.01, '', (v) => s.setPrefs({ exportQuality: v }));
+    exportMenu.append(h('div', { class: 'micro', style: 'margin-bottom:8px' }, 'Format · 格式'), formats, quality);
+    const supported = new Map<ExportFormat, boolean>();
+    void Promise.all(EXPORT_FORMATS.map(async (f) => supported.set(f.key, await canEncode(f.key)))).then(() => {
+      formats.querySelectorAll('button').forEach((b, i) => {
+        const f = EXPORT_FORMATS[i];
+        if (supported.get(f.key) === false) { b.disabled = true; b.querySelector('small')!.textContent = 'not in this browser'; b.title = `${f.label} encoding is not available in this browser`; }
+      });
+    });
+    document.addEventListener('pointerdown', (e) => { if (!exportMenu.hidden && !exportMenu.contains(e.target as Node) && !menuBtn.contains(e.target as Node)) exportMenu.hidden = true; });
+    const exportWrap = h('div', { class: 'exportwrap' }, h('div', { class: 'splitbtn' }, exportBtn, menuBtn), exportMenu);
     const saveBtn = h('button', { class: 'textbtn', onClick: () => a.saveModel() }, bi('Save model', '儲存模型'), h('span', { class: 'key' }, 'S'));
     const loadInput = h('input', { type: 'file', accept: '.otsr', hidden: true, onChange: () => { const f = loadInput.files?.[0]; if (f) void a.openModelFile(f); loadInput.value = ''; } });
-    const output = section('Output', '輸出', scales, customScale, exportBtn,
+    const output = section('Output', '輸出', scales, customScale, exportWrap,
       h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, bi('Load model', '載入模型'), h('span', { class: 'arrow' }, '↗')), loadInput));
     this.refreshers.push((st) => {
       const base = st.model ?? st.image;
       scales.querySelectorAll('button').forEach((b, i) => {
         if (i < SCALES.length) b.querySelector('small')!.textContent = base ? `${px(base.W * SCALES[i])}×${px(base.H * SCALES[i])}` : '';
       });
+      const f = EXPORT_FORMATS.find((x) => x.key === (st.prefs.exportFormat ?? 'png')) ?? EXPORT_FORMATS[0];
+      exportLabel.replaceChildren(...bi(`Export ${f.label}`, `匯出 ${f.label}`).childNodes);
+      quality.hidden = !f.lossy;
       exportBtn.disabled = !st.model || !!st.job;
+      menuBtn.disabled = !!st.job;
       saveBtn.disabled = !st.model?.cpu || !!st.job;
     });
 
@@ -288,10 +309,12 @@ export class Panel {
     return h('label', { class: 'field' }, h('span', null, label, h('i', { class: 'zh' }, zh)), this.numberInput(key, min, max, step, onChange));
   }
 
-  private rangeField(label: string, zh: string, key: 'edgePx', min: number, max: number, step: number, unit: string, onChange: (v: number) => void): HTMLElement {
-    const input = h('input', { type: 'range', min, max, step, value: String(this.store.state.prefs[key] ?? EDGE_PX) });
-    const out = h('output', null, `${Number(input.value).toFixed(1)} ${unit}`);
-    input.addEventListener('input', () => { out.textContent = `${Number(input.value).toFixed(1)} ${unit}`; onChange(Number(input.value)); });
+  private rangeField(label: string, zh: string, key: 'edgePx' | 'exportQuality', min: number, max: number, step: number, unit: string, onChange: (v: number) => void): HTMLElement {
+    const fmt = (v: number) => (key === 'exportQuality' ? `${Math.round(v * 100)}` : `${v.toFixed(1)} ${unit}`);
+    const input = h('input', { type: 'range', min, max, step, value: String(this.store.state.prefs[key] ?? (key === 'edgePx' ? EDGE_PX : 0.92)) });
+    const out = h('output', null, fmt(Number(input.value)));
+    input.addEventListener('input', () => { out.textContent = fmt(Number(input.value)); onChange(Number(input.value)); });
+    this.refreshers.push((st) => { const v = st.prefs[key]; if (typeof v === 'number' && document.activeElement !== input) { input.value = String(v); out.textContent = fmt(v); } });
     return h('label', { class: 'range' }, h('span', null, label, h('i', { class: 'zh' }, zh)), out, input);
   }
 }

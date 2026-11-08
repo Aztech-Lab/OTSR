@@ -1,7 +1,7 @@
 // The application state: one store, one subscribe. Preferences persist in localStorage (best effort).
 
 import type { AdapterInfo } from '../engine';
-import type { LoadedImage } from './image';
+import type { ExportFormat, LoadedImage } from './image';
 import type { Roi } from './roi';
 
 export type Mode = 'simple' | 'research';
@@ -61,6 +61,9 @@ export interface Prefs {
   edgePx: number;
   loss: Loss;
   scale: number;
+  exportFormat: ExportFormat;
+  /** Quality of the lossy export formats, 0.5..1. */
+  exportQuality: number;
   compare: CompareMode;
   compareWith: 'bicubic' | 'bilinear' | 'nearest';
   theme: Theme;
@@ -140,6 +143,8 @@ export const DEFAULT_PREFS: Prefs = {
   edgePx: 1.4,
   loss: 'l2',
   scale: 4,
+  exportFormat: 'png',
+  exportQuality: 0.92,
   compare: 'split',
   compareWith: 'bicubic',
   theme: 'light',

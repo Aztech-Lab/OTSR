@@ -10,14 +10,14 @@
 </head>
 <body data-mode="simple" class="empty">
   <div id="stage">
-    <div class="bg" aria-hidden="true"><canvas id="bgfield"></canvas><i class="frost"></i><i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i></div>
+    <div class="bg" aria-hidden="true"><i class="grid"></i><i class="ring r1"></i><i class="ring r2"></i><canvas id="stars"></canvas></div>
     <canvas id="view"></canvas>
     <canvas id="overlay" aria-hidden="true"></canvas>
     <div class="vignette" aria-hidden="true"></div>
   </div>
   <div id="frame" class="frame" hidden><i></i><i></i><i></i><i></i><span class="tag" id="frame-tag">SAMPLE // 01</span><span class="scan"></span></div>
 
-  <header class="float brand" aria-label="OTSR">
+  <header class="float brand" id="brand" title="Back to the start screen (Home) · 回到主頁" aria-label="OTSR">
     <div class="row1"><h1>OTSR</h1><span class="badge">V0.1</span></div>
     <div class="row2"><span class="barcode" aria-hidden="true"></span><span class="micro">Optimal-transport Gaussian super-resolution</span></div>
   </header>
@@ -114,6 +114,7 @@
   <footer class="float statusbar">
     <span><i id="status-dot" class="sq ok"></i>&nbsp; Status</span>
     <span class="fill" id="status"></span>
+    <span class="notice" id="notice" role="status" aria-live="polite" hidden></span>
     <span class="seg-count" id="seg-count" aria-hidden="true"></span>
     <span class="cursor" id="cursor">X — Y —</span>
     <span class="right"><span id="adapter">GPU —</span> &nbsp;·&nbsp; <span id="clock">--:--:--</span> &nbsp;·&nbsp; <button id="reload-btn" class="textbtn"><span class="bi"><b>Reinit</b><small>重新初始化</small></span><span class="arrow">↗</span></button></span>

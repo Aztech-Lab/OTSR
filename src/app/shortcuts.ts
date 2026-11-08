@@ -7,7 +7,8 @@ import type { Viewer } from './viewer';
 export const SHORTCUTS: [string, string][] = [
   ['O', 'Open image'],
   ['F / Enter', 'Fit'],
-  ['E', 'Export PNG'],
+  ['E', 'Export in the chosen format'],
+  ['Home', 'Back to the start screen'],
   ['S', 'Save model'],
   ['Esc', 'Cancel the running job / leave the region tool'],
   ['C', 'Toggle the split comparison'],
@@ -52,7 +53,7 @@ export function installShortcuts(store: Store, actions: Actions, viewer: Viewer,
     switch (k) {
       case 'o': case 'O': openFile(); break;
       case 'f': case 'F': case 'Enter': void actions.fit(); break;
-      case 'e': case 'E': void actions.exportPng(); break;
+      case 'e': case 'E': void actions.exportImage(); break;
       case 's': case 'S': actions.saveModel(); break;
       case 'Escape':
         if (s.job) actions.jobs.cancel();
