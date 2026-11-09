@@ -101,8 +101,13 @@ body.empty .brand .chip { display: none; }
 .instrument .center .micro { color: var(--copper); }
 .instrument h2 { margin: 10px 0 4px; font-size: 30px; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
 .instrument .zh { font-size: 13px; color: var(--muted); letter-spacing: 0.3em; }
-.instrument .open { margin-top: 22px; }
-.instrument .open .btn { display: inline-flex; }
+/* the three start actions share one column: the pair on top, the report entry under it at the same width */
+.homeacts { display: inline-grid; width: max-content; max-width: calc(100vw - 24px); grid-template-columns: 100%; margin-top: 22px; }
+.homeacts .pair { display: flex; }
+.homeacts .pair .btn { flex: 1 1 auto; height: 56px; padding: 0 20px; gap: 18px; }
+.homeacts .btn .bi b, .homeacts .report .bi b { font-size: 12.5px; white-space: nowrap; }
+.homeacts .btn .bi small, .homeacts .report .bi small { margin-top: 5px; font-size: 10.5px; }
+.homeacts .btn .arrow { font-size: 16px; }
 /* the joined pair: Load sample (pale) on the left, Open image (copper) on the right */
 .pair { display: inline-flex; gap: 0; }
 .pair .btn { height: 46px; }
@@ -113,9 +118,11 @@ body.empty .brand .chip { display: none; }
 .samplesel { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .samplesel select { width: 260px; padding: 4px 8px; font-size: 11px; }
 /* the technical report entry under the pair */
-.instrument .report { display: flex; width: fit-content; margin: 18px auto 0; align-items: center; gap: 10px; height: 32px; padding: 0 12px; border: 1px solid var(--line); color: var(--text); text-decoration: none; clip-path: var(--chamfer-sm); transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.instrument .report { display: flex; margin-top: 12px; align-items: center; justify-content: space-between; gap: 14px; height: 50px; padding: 0 20px; border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; clip-path: var(--chamfer-sm); transition: color 0.15s, border-color 0.15s, background 0.15s;
+  /* frosted glass: the rings and the starlight show through, blurred */
+  background: color-mix(in srgb, var(--panel-solid) 42%, transparent); backdrop-filter: blur(12px) saturate(1.4); }
 .instrument .report:hover { color: var(--copper); border-color: var(--copper); background: var(--copper-soft); }
-.instrument .report .arrow { font-size: 12px; }
+.instrument .report .arrow { font-size: 16px; }
 .corner-note { position: absolute; font: 500 10px/1.6 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 .corner-note.tl { left: 6px; top: 6px; }
 .corner-note.tr { right: 6px; top: 6px; text-align: right; }
@@ -128,7 +135,7 @@ body.entering .instrument .open, body.entering .instrument .samplesel, body.ente
 body:not(.empty):not(.entering) .instrument, body:not(.empty) .bootlog, body.empty .console, body.empty .bookmark, body.empty .paneltab, body.empty .monitor, body.empty .zoombar, body.empty .command, body:not(.has-fit) .result-hud { display: none; }
 
 /* ---- system check (start screen, bottom right): the verdict, then the facts behind it -------------------------------- */
-.syscheck { right: 40px; bottom: 62px; width: 364px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer); animation: fadein 0.6s 0.15s both; }
+.syscheck { right: 40px; bottom: 62px; width: 364px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); clip-path: var(--chamfer); animation: fadein 0.6s 0.15s both; }
 body:not(.empty) .syscheck { display: none; }
 body.arriving .syscheck { animation: fadein 0.5s 0.5s both; }
 .syscheck .console-head { height: 32px; padding-left: 18px; }
@@ -196,7 +203,7 @@ body.arriving .bootlog { animation: fadein 0.5s 0.5s both; }
 body.no-motion.leaving *, body.no-motion.arriving * { animation: none !important; }
 
 /* ---- console (left) and monitor (right): copper brackets at the top-left and bottom-right corners ---------------- */
-.console, .monitor { top: 120px; bottom: 96px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer); }
+.console, .monitor { top: 120px; bottom: 96px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); clip-path: var(--chamfer); }
 .console { left: 40px; width: var(--console-w); }
 .monitor { right: 40px; width: var(--monitor-w); transform: translateX(40px); opacity: 0; pointer-events: none; transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.3s; }
 body.monitor-open .monitor { transform: none; opacity: 1; pointer-events: auto; }
@@ -340,7 +347,7 @@ select option { background: var(--bg); }
 .runsplit { display: flex; gap: 2px; }
 .runsplit .btn.menu, .cmdinfo { display: none; }
 .command #cmd-sub { margin-top: 8px; text-align: center; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.command .live { padding: 12px 14px 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); }
+.command .live { padding: 12px 14px 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); }
 .command .live .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .command .live .head .micro:first-child { color: var(--copper); }
 .command .live .nums { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
@@ -376,7 +383,7 @@ body.monitor-open .result-hud { right: calc(80px + var(--monitor-w)); }
 .zoombar .tools { display: flex; gap: 8px; padding-bottom: 2px; }
 .zoombar .tools .textbtn .arrow { width: auto; height: auto; border: 0; clip-path: none; font-size: 11px; }
 .viewwrap { position: relative; }
-.viewmenu { position: absolute; bottom: 44px; right: 0; width: min(320px, calc(100vw - 24px)); padding: 8px 16px 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); z-index: 20; }
+.viewmenu { position: absolute; bottom: 44px; right: 0; width: min(320px, calc(100vw - 24px)); padding: 8px 16px 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); z-index: 20; }
 .viewmenu .switch { margin-top: 10px; }
 
 /* ---- status strip (bottom) -------------------------------------------------------------------------------------- */
@@ -424,7 +431,7 @@ body.busy #view { cursor: progress; }
 .statusbar.has-notice .fill { max-width: 26%; }
 .statusbar .seg-count { margin-left: auto; }
 dialog.modal { padding: 0; width: min(760px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; overscroll-behavior: contain; background: var(--panel-solid); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow); clip-path: var(--chamfer); }
-dialog.modal::backdrop { background: rgba(10, 12, 11, 0.35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+dialog.modal::backdrop { background: rgba(10, 12, 11, 0.35); backdrop-filter: blur(14px); }
 dialog.modal .console-head { position: sticky; top: 0; padding-left: 18px; }
 dialog.modal .body { padding: 22px 30px 26px; }
 dialog.modal h2 { margin: 0 0 18px; font-size: 26px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
@@ -452,7 +459,7 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
 
 /* ---- phones and small tablets: the console is a bottom sheet, the zoom bar sits on it, no blur anywhere --------------- */
 @media (max-width: 960px) {
-  .console, .monitor, .command .live, .viewmenu, dialog.modal::backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .console, .monitor, .command .live, .viewmenu, dialog.modal::backdrop { backdrop-filter: none; }
   .console, .command .live, .viewmenu { background: var(--panel-solid); }
   .brand { left: 14px; top: 12px; transition: none; }
   body.empty .brand, body.leaving .brand { left: 14px; transform: none; }
@@ -471,7 +478,7 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .themebtn { padding: 0 11px; }
   .instrument { top: 36%; width: min(300px, 80vw); height: min(300px, 80vw); transform: translate(-50%, -50%); }
   /* the system check under the instrument, scrolling inside when the screen is short */
-  .syscheck { left: 50%; right: auto; bottom: 12px; width: min(560px, calc(100vw - 24px)); max-height: calc(64vh - min(150px, 40vw) - 24px); transform: translateX(-50%); background: var(--panel-solid); backdrop-filter: none; -webkit-backdrop-filter: none; clip-path: var(--chamfer-sm); }
+  .syscheck { left: 50%; right: auto; bottom: 12px; width: min(560px, calc(100vw - 24px)); max-height: calc(64vh - min(150px, 40vw) - 24px); transform: translateX(-50%); background: var(--panel-solid); backdrop-filter: none; clip-path: var(--chamfer-sm); }
   .syscheck .console-head { height: 28px; padding-left: 14px; }
   .syscheck .sc-body { padding: 9px 12px 11px; }
   .sc-verdict b { font-size: 13px; }
@@ -484,11 +491,13 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .diag { grid-template-columns: 1fr; gap: 2px; }
   .diag dd { margin-bottom: 6px; }
   .instrument h2 { font-size: 22px; }
-  .instrument .open { margin-top: 16px; }
-  .pair .btn { height: 42px; padding: 0 12px; gap: 10px; }
+  .homeacts { margin-top: 18px; }
+  .homeacts .pair .btn { height: 52px; padding: 0 14px; gap: 12px; }
+  .homeacts .btn .bi b, .homeacts .report .bi b { font-size: 12px; }
+  .homeacts .btn .bi small, .homeacts .report .bi small { font-size: 10px; }
   .samplesel { margin-top: 10px; }
   .samplesel select { width: 200px; }
-  .instrument .report { margin-top: 14px; }
+  .instrument .report { margin-top: 10px; height: 48px; padding: 0 14px; }
   /* the sheet: full width at the bottom, scrolling body, the title bar is the handle */
   .console { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 58vh; border-left: 0; border-right: 0; border-bottom: 0; clip-path: none; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.16); }
   .console::before, .console::after { display: none; }

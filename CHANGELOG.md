@@ -38,6 +38,7 @@ In the app:
 - **A lighter phone console**: Output and Export only (the model file buttons and the process log stay on computers),
   so the image takes most of the screen; the sheet rises in when it opens, also by itself after a fit. The start
   screen keeps all its motion on phones, and the settings no longer scroll sideways on narrow screens.
+  The three start actions are larger, and the report entry spans the width of the pair above it, on frosted glass.
 - **The fit animation no longer slows the fit.** Its mesh was stroked two canvas pixels wide on high-density screens,
   a slow path of the 2-D canvas, and redrawn at the display rate: in headless Chrome the fit ran at about a third of
   its speed while the mesh was on screen. The mesh is now drawn with hairlines and one fill per brightness level
@@ -75,6 +76,8 @@ The technical report:
 
 Found on the way:
 
+- The frosted panels were not frosted in current Chrome: the build kept only the `-webkit-` form of `backdrop-filter`,
+  which Chrome no longer reads. The stylesheet now gives the standard property alone.
 - After every fit the monitor's snapshot loop finished its 600 ms wait before the fit could end — up to 0.6 s added to
   each fit, and after a failed fit the loop kept running. It now stops at once, also on failure.
 - docs/performance.md said that halving the budget roughly halves the fit time. On the RTX 4090 at 2048 × 2048,
