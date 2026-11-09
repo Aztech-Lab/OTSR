@@ -1,5 +1,8 @@
 # Changelog
 
+Each entry records what the version brought, how it was verified before release, and what was found and fixed on
+the way. Numbers are from the machines named; the engine (`src/engine`) is unchanged since 0.1.0 except where said.
+
 ## 0.1.3 — 2026-11-08
 
 Phones, a technical report, a tighter console, less work per frame.
@@ -23,6 +26,29 @@ Phones, a technical report, a tighter console, less work per frame.
   skipped when the panel is not shown; canvas resizes are coalesced; the export label is rebuilt only when the format
   changes; the unused icon set is gone. The design tokens live in `src/tokens.css`, shared by the app and the report.
 - One sample image needs no selector; the settings show the GPU in use.
+
+Found and fixed before release (a review of the change set, each finding traced in the code):
+
+- The tile-entry read-back after a render was queued *before* the frame's own build (the read-back submits its
+  own copy right away), so it measured the previous build; after a window resize or a single zoom step the bottom
+  tiles of the image could stay empty until the next pan. The check now runs after the submit, and a check that
+  cannot run yet is deferred, never dropped.
+- The folded sheet's title bar showed on the start screen (the collapsed state is now only a layout class while an
+  image is loaded); on 360–400 px phones the report chip overlapped the system buttons (hidden there — the start
+  screen and the settings keep the link), the research zoom bar was wider than the screen and the view menu hung
+  off it (both tightened); a two-finger pinch started in the region tool committed a stray 8 × 8 region (the region
+  is restored); the Gaussian-outline note did not follow the zoom; in landscape the notices overlapped the console
+  column; `viewport-fit=cover` without safe-area insets put buttons under a notch (removed).
+- The report said a laptop GPU was slower "by the ratio of the cards"; it now gives the measured 5–20× for a
+  discrete laptop GPU and a minute or two for an integrated one. The SAD comparison's time range is 38–60 % of
+  SAD's time, as the figure's legend says (the porting record had 40–55 %).
+
+Verified: build and type check; unit 6/6; GPU golden tests 8/8 (Dawn, RTX 5070 Ti); browser smoke test; the phone
+suite on four touch viewports (390 × 844, 360 × 800, 844 × 390, 820 × 1180 — start screen, image, sheet or column,
+pinch, a fit, menus, dialogs, dark theme, the report page; every floating element inside the viewport, no sideways
+scrolling); desktop screenshot series with a synthetic image and with the 1024 × 815 sample (83,592 Gaussians,
+1500 steps, 47.6 dB in 1.8 s on the 5070 Ti). Real phones were not in the loop; the layout was tested with Chrome's
+touch emulation.
 
 ## 0.1.2 — 2026-11-08
 
@@ -49,6 +75,16 @@ The extras and the vector view.
   with Load sample / Open image as one pair and the wordmark centred.
 - Second fits no longer trip a destroyed-buffer error from the monitor's crop renderer.
 
+Found and fixed on the way: the first fit animation drew the Gaussians on the 2-D overlay and stalled at a few
+frames per second — replaced by the GPU render of a recoloured copy of the live parameters; a colour-field version
+of the vector view was replaced by the paper's per-Gaussian random colour × luma; the clip-path on the canvas swallowed
+pointer events (the stage now receives them); a second fit submitted a destroyed crop buffer (renderers are retired
+and destroyed after their render loop; a regression step covers it).
+
+Verified: build; unit 6/6; GPU golden 8/8; browser smoke test; two screenshot series (synthetic 120 × 80 and the
+1024 × 815 sample: 83,592 Gaussians, 1500 steps ≈ 2.5 s, 47.62 dB on the 5070 Ti; PNG / JPEG / WebP / BMP export
+available, AVIF not in Chrome; the way back to the start screen leaves an empty state).
+
 ## 0.1.1 — 2026-11-08
 
 Research mode.
@@ -59,6 +95,13 @@ Research mode.
   map (|model − source|, inferno scale with automatic gain), a shared region-of-interest tool, and session
   information with the PSNR curve of the last fit.
 - The engine's fit loop takes the loss option; the default path is unchanged (golden tests).
+
+Engine additions for this version, all with the default path unchanged: `View.loss_kind` and a Charbonnier branch
+in `backward.wgsl`; `transportMap(..., { onStage })` projecting every Sinkhorn stage's barycentric map inside the
+single submit; `otInit({ onPhase, onStage })`; the display-only `recolour.wgsl` kernel and `Rasterizer.setParams()`.
+
+Verified: build; unit 6/6; GPU golden 8/8 (the L2 path bit-for-bit as before); browser smoke test; L1 fits on the
+synthetic image and the sample (the PSNR is reported against the source in both cases).
 
 ## 0.1.0 — 2026-11-07
 
@@ -71,3 +114,9 @@ First public version: the engine and the industrial sci-fi UI.
   with cancel, time and memory estimates, light / dark theme — in the lab-white / copper flat design.
 - `.otsr` model file format 1.0 (`docs/file-format.md`), readable from Python (`reference/otsr_ref/fileformat.py`).
 - Python reference implementation and golden tests; GPU kernel tests through Dawn in Node; browser smoke test.
+
+Verified: the forward pass within 1.2 × 10⁻⁶ of the float64 dense reference, all nine gradient columns within
+1.4 × 10⁻⁶ of float64 autograd, Adam within 10⁻⁷ of PyTorch, the 40-step golden fit identical to four decimals, the
+edge pass within 8 × 10⁻⁷, tiled export equal to untiled (docs/testing.md); the research CUDA pipeline reproduced
+within run-to-run noise (43.62 vs 43.55 dB, 46.49 vs 46.48 dB on two Kodak images) in 1/60 of the time; RTX 4090
+timings in docs/performance.md.
