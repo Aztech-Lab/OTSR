@@ -106,7 +106,8 @@ are not shown on phones; notices appear above the zoom bar. Fits run on the phon
 longer: start with the *Fast* preset.
 
 The **technical report** (`report.html`, from the start screen, the chip next to the version badge or the settings)
-explains the method, the engine and the research process on one page.
+tells the method behind the app in plain words, with nine live demonstrations, what the app does and how the
+engine works.
 
 ## Keyboard shortcuts
 

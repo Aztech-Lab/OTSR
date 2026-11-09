@@ -2,6 +2,7 @@
 // the scroll position, and the motion switch of the app respected.
 
 import './report.css';
+import { mountDemos } from './report-demos';
 
 const PREFS_KEY = 'otsr.prefs.v1';
 
@@ -33,6 +34,8 @@ const prefs = readPrefs();
 let theme: Theme = (prefs.theme as Theme) ?? 'light';
 apply(theme);
 if (prefs.motion === false) document.body.classList.add('no-motion');
+// the live demonstrations follow the app's motion setting and the system preference
+mountDemos(() => prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches);
 document.getElementById('theme-btn')?.addEventListener('click', () => {
   theme = effectiveTheme(theme) === 'dark' ? 'light' : 'dark';
   apply(theme);

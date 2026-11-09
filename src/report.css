@@ -23,7 +23,7 @@ body.no-motion * { transition: none !important; }
 
 /* ---- page grid ----------------------------------------------------------------------------------------------- */
 .page { display: grid; grid-template-columns: 220px minmax(0, 760px); gap: 56px; justify-content: center; padding: 44px 28px 80px; }
-.toc { position: sticky; top: 86px; align-self: start; font-size: 12.5px; }
+.toc { position: sticky; top: 86px; align-self: start; font-size: 12.5px; max-height: calc(100vh - 100px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding-right: 8px; }
 .toc ol { list-style: none; margin: 10px 0 0; padding: 0; border-left: 1px solid var(--line); }
 .toc li { margin: 0; }
 .toc a { display: block; padding: 5px 0 5px 14px; margin-left: -1px; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
@@ -115,3 +115,51 @@ footer a { text-decoration-color: var(--copper); }
   ol.steps li { padding-left: 38px; }
   td, th { padding-right: 8px; }
 }
+
+/* ---- the paper woven in: its figures and tables, equations, citations, the in-the-app / paper tags ---------------- */
+.fig.paper img + img, .fig img.stack + img { margin-top: 8px; }
+.eq { position: relative; margin: 12px 0 16px; padding: 10px 40px 10px 14px; font: italic 500 15px/1.6 "Times New Roman", Times, serif; text-align: center; color: var(--ink); background: var(--bg-2); border-left: 3px solid var(--copper); overflow-x: auto; }
+.eq .n { position: absolute; right: 12px; top: 10px; font: 500 10px/1 var(--mono); color: var(--muted); font-style: normal; }
+.tablewrap.paper table { font-size: 12.5px; }
+.tablewrap.paper th, .tablewrap.paper td { padding: 6px 8px 6px 0; text-align: right; white-space: nowrap; }
+.tablewrap.paper th:first-child, .tablewrap.paper td:first-child { text-align: left; white-space: normal; min-width: 150px; }
+.tablewrap.paper caption { caption-side: top; text-align: left; font: 500 11px/1.65 var(--mono); letter-spacing: 0.03em; color: var(--muted); padding: 0 0 8px; }
+.tablewrap.paper caption b, .fig.paper figcaption b { color: var(--copper); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 6px; }
+.tablewrap.paper td.ours, .tablewrap.paper th.ours { background: var(--copper-soft); }
+.tablewrap.paper td.best { font-weight: 700; color: var(--ink); }
+.tablewrap.paper tr.group td { font: 600 10px/1.4 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding-top: 12px; text-align: left; white-space: normal; }
+.contrib { padding-left: 20px; }
+.contrib li { margin-bottom: 8px; }
+a.cite { text-decoration: none; color: var(--copper); font: 500 0.85em var(--mono); }
+a.cite:hover { text-decoration: underline; }
+.tag { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; font: 700 9px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; clip-path: var(--chamfer-sm); vertical-align: middle; white-space: nowrap; }
+.tag.app { background: var(--copper); color: var(--on-copper); }
+.tag.paper { border: 1px solid var(--line-strong); color: var(--text); }
+section h2 .tag { margin-left: 2px; }
+p .tag { margin-right: 6px; }
+.refs li:target { background: var(--copper-soft); }
+/* the live demonstrations */
+.fig.demo .demo-stage { border: 1px solid var(--line); background: var(--bg-2); padding: 8px; }
+.fig.demo .demo-stage svg, .fig.demo .demo-stage canvas { display: block; width: 100%; height: auto; }
+.fig svg .ink { stroke: var(--text); }
+.demo-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 8px; }
+.demo-ctl .ctl { display: inline-flex; align-items: center; gap: 8px; font: 500 10px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.demo-ctl input[type=range] { width: 120px; accent-color: var(--copper); }
+.demo-ctl output { font: 500 11px/1 var(--mono); color: var(--text); min-width: 40px; }
+.demo-ctl .check input { accent-color: var(--copper); width: 14px; height: 14px; }
+.demo-ctl .textbtn { height: 28px; padding: 0 10px; font: 600 10px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+.demo-ctl > .mu { font: 500 11px/1 var(--mono); color: var(--text); }
+.twoup { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.twoup canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #ebebe8; }
+.twoup .mu { margin-top: 6px; font: 500 9px/1.4 var(--mono); letter-spacing: 0.1em; color: var(--muted); }
+.toc .grp { margin: 12px 0 2px 14px; font: 600 9px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--copper); }
+figcaption .zh, .lead .zh { display: block; margin-top: 4px; font-family: var(--sans); letter-spacing: 0.02em; }
+@media (max-width: 960px) {
+  .toc .grp { margin-left: 0; grid-column: 1 / -1; }
+  .tablewrap.paper th:first-child, .tablewrap.paper td:first-child { min-width: 110px; }
+  .demo-ctl input[type=range] { width: 90px; }
+}
+/* pull quotes: one sentence set large, the way a magazine lifts a line out of the text */
+.pull { margin: 22px 0; padding: 14px 22px; border-left: 3px solid var(--copper); background: var(--bg-2); font: 500 17px/1.55 var(--brand-font); color: var(--ink); }
+@media (max-width: 960px) { .pull { font-size: 15.5px; padding: 12px 16px; } }
+.refs li { padding-left: 2px; }

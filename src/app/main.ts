@@ -88,7 +88,7 @@ async function boot(): Promise<void> {
   const store = new Store();
   applyLook(store.state.prefs.theme, store.state.prefs.motion !== false);
   const log = bootLog();
-  log('SYS.INIT // OTSR 0.1.3');
+  log('SYS.INIT // OTSR 0.1.4');
   const status = $('status');
   const statusDot = $('status-dot');
   const readoutValue = $('readout-value');

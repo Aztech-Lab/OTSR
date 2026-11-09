@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.1.3" src="https://img.shields.io/badge/version-0.1.3-c47a3a">
+  <img alt="version 0.1.4" src="https://img.shields.io/badge/version-0.1.4-c47a3a">
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-2b2b2b">
   <img alt="WebGPU" src="https://img.shields.io/badge/runs%20on-WebGPU-2b2b2b">
 </p>
@@ -49,8 +49,9 @@ is much faster. Then:
    re-renderable at any size later with **Load .otsr**).
 
 On a phone the console is a sheet at the bottom (tap its title bar to open or fold it), two fingers zoom, and the
-rest is the same. The **[technical report](https://aztech-lab.github.io/OTSR/report.html)** explains the method, the
-engine and the research behind it on one page.
+rest is the same. The **[technical report](https://aztech-lab.github.io/OTSR/report.html)** tells the method of the paper behind
+the app the way a magazine would, with nine live demonstrations, what the app does, how the engine works, and a
+reading list.
 
 **Research** mode opens every parameter (Gaussians per pixel, steps, edge width, L1 / L2 loss), the split comparison
 against any resampler, the region tool and the session information with the PSNR curve. Everything has a keyboard
@@ -126,6 +127,7 @@ docs/                     documentation (method, engine, file format, testing, p
 
 | Version | What it brought |
 |---|---|
+| **0.1.4** | The **technical report**, rewritten as a magazine would tell it: the method of the paper in plain words, nine live demonstrations, the results in prose, a reading list of 45 entries. |
 | **0.1.3** | **Phones**: a bottom-sheet layout with pinch zoom, a column layout sideways; the **technical report** page; the mode switch in the console's title bar and a console that keeps its width; less work per frame. |
 | **0.1.2** | The extras and the **vector view**: the model in Gaussian-id colours, the fit animation (OT lattice → Gaussians → scan reveal), the monitor panel, the View menu (vector / OT lattice / outlines / error map), export as PNG / JPEG / WebP / AVIF / BMP, a process log, notices in the status strip, bilingual labels, starlight and geometry on the stage, the way back to the start screen. |
 | **0.1.1** | **Research mode**: custom budget and steps, edge width, L1 / L2 loss, view modes and split against any resampler, 1σ outlines, error map, region tool, session info with the PSNR curve. |

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.4 — 2026-11-09
+
+The technical report, rewritten as a magazine would tell it.
+
+- **The method in plain words.** `report.html` now tells the whole story of the workshop paper behind the app —
+  the problem, the picture made of Gaussians, where they should go, the transport, the solver, the re-layout, the
+  renderer, the fit, super-resolution, what the paper measured, editing through the lattice, the limits — in a
+  magazine register, with the paper's results quoted in prose. No figures or tables are copied from the paper.
+  Copper *In the app* tags mark what the app does now; *Paper* tags what the experiments show but the app does not do
+  yet (the error-driven re-layout, the degradation-consistent refinement, the fold penalty).
+- **Nine live demonstrations**, computed in the page on the CPU: the lattice unfolding along a convex-potential map
+  with the Gaussians inherited from the cells (A); equal shares in one dimension, quantiles against samples (B); the
+  same in two dimensions with a real entropic transport solve and nearest-centre cells coloured by their share (H);
+  additive against weight-normalised blending (C); the edge pass across an edge at any S (D), and applied to a
+  rendered glyph next to its pixels at any scale (E); real Sinkhorn iterations with ε-scaling, the plan sharpening
+  into the map (F); the error-driven re-layout (G); editing through the lattice by dragging vertices, folded cells
+  shown in red (I). Each has Play / Pause and sliders, runs only while on screen and follows the app's motion setting.
+- **A reading list** of 45 entries: the paper's 28 references and 17 more — Monge, Kantorovich, Brenier, Villani,
+  Sinkhorn–Knopp, Lloyd, EWA splatting, Keys, Lanczos, the WebGPU specifications — each with a line on why it is here.
+- The contents list scrolls on short windows; the report entry on the start screen sits under the pair.
+
+Verified: build and type check; the report's HTML balanced, no duplicate ids, every local link and citation target
+present; desktop and phone review shots of every demo and section — all nine demos mounted, no element outside the
+viewport on either; the unit, GPU, browser and phone suites as before.
+
 Each entry records what the version brought, how it was verified before release, and what was found and fixed on
 the way. Numbers are from the machines named; the engine (`src/engine`) is unchanged since 0.1.0 except where said.
 

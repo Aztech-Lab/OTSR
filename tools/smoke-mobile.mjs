@@ -202,7 +202,7 @@ try {
     check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'report: no sideways scroll');
     check(await page.evaluate(() => [...document.querySelectorAll('.fig svg, .fig img, pre, .tablewrap, .numbers, .top')].every((el) => el.getBoundingClientRect().right <= window.innerWidth + 1)), 'report: figures, code, tables and the top bar inside the viewport');
     await shot('11_report');
-    await page.evaluate(() => document.getElementById('research').scrollIntoView());
+    await page.evaluate(() => document.getElementById('port').scrollIntoView());
     await sleep(600);
     await shot('12_report_figures');
     await page.close();
