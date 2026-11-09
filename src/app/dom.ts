@@ -43,6 +43,16 @@ export function fmtInt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
 
+/** Counts as the compact readouts show them: 950, 41.7k, 1.25M. */
+export function fmtCount(n: number): string {
+  return n >= 1e6 ? `${+(n / 1e6).toFixed(2)}M` : n >= 1e4 ? `${+(n / 1e3).toFixed(1)}k` : fmtInt(n);
+}
+
+/** Writes text only when it differs (a store change of any kind runs every subscriber; unchanged text stays put). */
+export function setText(el: HTMLElement, text: string): void {
+  if (el.textContent !== text) el.textContent = text;
+}
+
 /** Draws a PSNR curve into an SVG polyline (viewBox 0 0 240 36). */
 export function sparkline(svg: SVGSVGElement, pts: { step: number; psnr: number }[], steps: number): void {
   const line = svg.querySelector('polyline');

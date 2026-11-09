@@ -4,8 +4,9 @@
    only and switches off with prefers-reduced-motion or the setting.
    Layout: the action at the top centre, console on the left (collapsible), monitor on the right (fits), zoom bar and
    status strip at the bottom, the result readout at the bottom right. The canvas is clipped to the image, so the
-   stage (a dot field with instrument geometry and starlight) shows around it. On phones (max-width 960px) the
-   console becomes a bottom sheet with the zoom bar docked above it; see the media block at the end. */
+   stage (a dot field with instrument geometry and starlight) shows around it. The start screen carries a system
+   check of the machine. On phones (max-width 960px) the console becomes a bottom sheet with the zoom bar docked above
+   it, and the action a split button (the tier in its menu) over a strip of readouts; see the media block at the end. */
 
 @import './tokens.css';
 
@@ -126,6 +127,30 @@ body.empty .brand .chip { display: none; }
 body.entering .instrument .open, body.entering .instrument .samplesel, body.entering .instrument .report { visibility: hidden; }
 body:not(.empty):not(.entering) .instrument, body:not(.empty) .bootlog, body.empty .console, body.empty .bookmark, body.empty .paneltab, body.empty .monitor, body.empty .zoombar, body.empty .command, body:not(.has-fit) .result-hud { display: none; }
 
+/* ---- system check (start screen, bottom right): the verdict, then the facts behind it -------------------------------- */
+.syscheck { right: 40px; bottom: 62px; width: 364px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer); animation: fadein 0.6s 0.15s both; }
+body:not(.empty) .syscheck { display: none; }
+body.arriving .syscheck { animation: fadein 0.5s 0.5s both; }
+.syscheck .console-head { height: 32px; padding-left: 18px; }
+.syscheck .sc-body { min-height: 0; padding: 12px 16px 14px; overflow-y: auto; scrollbar-width: thin; }
+.sc-verdict { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.sc-verdict .sq { align-self: center; }
+.sc-verdict b { font: 800 15px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ok); }
+.sc-verdict.warn b { color: var(--copper); }
+.sc-verdict.bad b { color: var(--danger); }
+.sc-verdict small { font: 500 11px/1 var(--sans); letter-spacing: 0.18em; color: var(--muted); white-space: nowrap; }
+.sc-verdict span { margin-left: auto; font: 500 10px/1.3 var(--mono); letter-spacing: 0.04em; color: var(--text); text-align: right; }
+.sc-rows { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px 12px; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.sc-rows dt { font: 600 9.5px/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.sc-rows dt small { display: block; font: 500 9.5px/1.3 var(--sans); letter-spacing: 0.16em; text-transform: none; color: var(--muted); }
+.sc-rows dd { margin: 0; min-width: 0; font: 500 11px/1.35 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.sc-rows dd small { display: block; font: 500 10px/1.35 var(--mono); color: var(--muted); }
+.sc-note { margin: 8px 0 0; font: 500 11px/1.6 var(--sans); color: var(--text); }
+.diag { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 6px 14px; margin: 0 0 14px; padding: 12px 14px; background: var(--bg-2); border: 1px solid var(--line); }
+.diag:empty { display: none; }
+.diag dt { font: 600 10px/1.4 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.diag dd { margin: 0; font: 500 11.5px/1.4 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+
 /* ---- entering the canvas: the instrument implodes, the image irises open, brackets fly in, a scan passes --------- */
 body.entering .instrument { animation: leave 0.7s cubic-bezier(0.6, 0, 0.9, 0.4) both; pointer-events: none; }
 body.entering .instrument .ring-spin { animation: spin 0.7s cubic-bezier(0.4, 0, 1, 1) both; }
@@ -183,14 +208,14 @@ body.left-closed .console { display: none; }
 .console-head .hatch { flex: 1; height: 8px; min-width: 12px; background: repeating-linear-gradient(135deg, currentColor 0 1px, transparent 1px 7px); opacity: 0.35; }
 .console-head .zh { font: 500 11px/1 var(--sans); letter-spacing: 0.2em; opacity: 0.8; white-space: nowrap; }
 .console-head > span:first-child { white-space: nowrap; }
-#console-state { white-space: nowrap; }
-/* the mode switch lives in the console's title bar: two stacked bilingual labels, the active one on copper */
-.headseg { display: inline-flex; gap: 2px; }
-.headseg button { display: flex; flex-direction: column; align-items: center; gap: 2px; height: 26px; padding: 0 9px; justify-content: center; color: var(--panel-head-text); opacity: 0.55; transition: opacity 0.15s, background 0.15s, color 0.15s; }
-.headseg button b { font: 700 9.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
-.headseg button small { font: 500 8.5px/1 var(--sans); letter-spacing: 0.16em; }
-.headseg button:hover { opacity: 1; }
-.headseg button.on { background: var(--copper); color: var(--on-copper); opacity: 1; clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px)); }
+/* the mode switch at the right of the console's title bar (the state of the work is in the status strip): a framed
+   pair of bilingual labels, the active one on copper */
+.headseg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid color-mix(in srgb, var(--panel-head-text) 32%, transparent); }
+.headseg button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 28px; padding: 0 13px; color: var(--panel-head-text); opacity: 0.72; transition: opacity 0.15s, background 0.15s, color 0.15s; }
+.headseg button b { font: 700 10.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+.headseg button small { font: 500 9px/1 var(--sans); letter-spacing: 0.18em; }
+.headseg button:hover { opacity: 1; background: color-mix(in srgb, var(--panel-head-text) 12%, transparent); }
+.headseg button.on { background: var(--copper); color: var(--on-copper); opacity: 1; }
 /* the sheet handle (phones only): collapses the console to its title bar */
 .sheet-toggle { display: none; width: 30px; height: 30px; place-items: center; color: var(--panel-head-text); font: 300 18px/1 var(--mono); }
 .sheet-toggle i { font-style: normal; transition: transform 0.25s; }
@@ -311,6 +336,9 @@ select option { background: var(--bg); }
 /* ---- command block: the one action at the top centre, inside the vignette ----------------------------------------- */
 .command { left: 50%; top: 30px; transform: translateX(-50%); width: 320px; }
 .command .btn.big { box-shadow: var(--shadow); }
+#cmd-idle { position: relative; }
+.runsplit { display: flex; gap: 2px; }
+.runsplit .btn.menu, .cmdinfo { display: none; }
 .command #cmd-sub { margin-top: 8px; text-align: center; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .command .live { padding: 12px 14px 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); clip-path: var(--chamfer-sm); }
 .command .live .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -354,6 +382,7 @@ body.monitor-open .result-hud { right: calc(80px + var(--monitor-w)); }
 /* ---- status strip (bottom) -------------------------------------------------------------------------------------- */
 .statusbar { left: 40px; right: 40px; bottom: 16px; display: flex; align-items: center; gap: 22px; font: 500 10px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
 .statusbar .fill { flex: 1; min-width: 0; }
+.statusbar .state { display: inline-flex; align-items: center; min-width: 74px; color: var(--text); white-space: nowrap; }
 #status { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0.04em; color: var(--text); }
 #status.error { color: var(--danger); }
 #status:empty::before { content: 'SYS.READY — awaiting input'; color: var(--muted); letter-spacing: 0.12em; }
@@ -440,7 +469,20 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .navbtn .key { display: none; }
   .navbtn .glyph { display: inline; }
   .themebtn { padding: 0 11px; }
-  .instrument { width: min(340px, 88vw); height: min(340px, 88vw); transform: translate(-50%, -50%); }
+  .instrument { top: 36%; width: min(300px, 80vw); height: min(300px, 80vw); transform: translate(-50%, -50%); }
+  /* the system check under the instrument, scrolling inside when the screen is short */
+  .syscheck { left: 50%; right: auto; bottom: 12px; width: min(560px, calc(100vw - 24px)); max-height: calc(64vh - min(150px, 40vw) - 24px); transform: translateX(-50%); background: var(--panel-solid); backdrop-filter: none; -webkit-backdrop-filter: none; clip-path: var(--chamfer-sm); }
+  .syscheck .console-head { height: 28px; padding-left: 14px; }
+  .syscheck .sc-body { padding: 9px 12px 11px; }
+  .sc-verdict b { font-size: 13px; }
+  .sc-rows { grid-template-columns: 84px minmax(0, 1fr); gap: 6px 10px; margin-top: 9px; padding-top: 9px; }
+  .sc-rows dt { font-size: 8.5px; }
+  .sc-rows dt small { font-size: 9px; }
+  .sc-rows dd { font-size: 10.5px; }
+  .sc-rows dd small { font-size: 9.5px; }
+  .sc-note { margin-top: 6px; font-size: 10.5px; line-height: 1.5; }
+  .diag { grid-template-columns: 1fr; gap: 2px; }
+  .diag dd { margin-bottom: 6px; }
   .instrument h2 { font-size: 22px; }
   .instrument .open { margin-top: 16px; }
   .pair .btn { height: 42px; padding: 0 12px; gap: 10px; }
@@ -455,16 +497,43 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   body.left-closed .sheet-toggle i { transform: rotate(180deg); }
   .console-head { height: 42px; padding: 0 6px 0 14px; gap: 8px; }
   .console-head .hatch { display: none; }
+  .headseg { margin-left: auto; }
+  .headseg button { padding: 0 11px; }
   .sheet-toggle { display: grid; }
   .console-body { padding: 10px 14px 16px; }
   body.entering .console { animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   body.leaving .console { animation: slideDown 0.4s cubic-bezier(0.6, 0, 0.9, 0.4) both; }
   @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } }
   @keyframes slideDown { to { transform: translateY(40px); opacity: 0; } }
-  /* the action under the top bar; a compact live readout */
-  .command { top: 56px; width: calc(100vw - 24px); }
+  /* the action under the top bar: a split button (Enhance | the tier, its menu below), the strip of readouts under it
+     (the source, its Gaussians, the GPU memory, the state; in the style of the console's Source boxes); a compact
+     live readout while a job runs */
+  .command { top: 56px; width: calc(100vw - 24px); max-width: 560px; }
   .command .btn.big { height: 46px; }
-  .command #cmd-sub { margin-top: 5px; font-size: 9px; }
+  .runsplit .btn.big { flex: 1; min-width: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+  .runsplit .btn.menu { display: inline-flex; flex: none; height: 46px; padding: 0 11px 0 13px; gap: 10px; box-shadow: var(--shadow); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+  .runsplit .btn.menu .bi small { white-space: nowrap; }
+  .runsplit .btn.menu .arrow { font-size: 11px; opacity: 0.85; transition: transform 0.2s; }
+  .runsplit .btn.menu[aria-expanded="true"] .arrow { transform: rotate(180deg); }
+  .command #cmd-sub { display: none; }
+  .cmdinfo { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); gap: 3px; margin-top: 5px; }
+  .cmdinfo .readout { padding: 5px 7px 6px; background: var(--panel-solid); }
+  .cmdinfo .readout .k { font-size: 8px; letter-spacing: 0.08em; }
+  .cmdinfo .readout .v { margin-top: 4px; font-size: 12.5px; }
+  .cmdinfo .src .v { font-size: 12px; font-weight: 700; }
+  .cmdinfo .state .v::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 5px 2px 0; background: var(--faint); vertical-align: middle; }
+  .cmdinfo[data-state="fitted"] .state .v::before, .cmdinfo[data-state="model"] .state .v::before { background: var(--ok); }
+  .cmdinfo[data-state="stopped"] .state .v::before { background: var(--copper); }
+  .tiermenu { position: absolute; left: 0; right: 0; top: 52px; z-index: 25; max-height: calc(100vh - 130px); overflow-y: auto; padding: 9px 10px 10px; background: var(--panel-solid); border: 1px solid var(--line); box-shadow: var(--shadow); clip-path: var(--chamfer-sm); }
+  .tiermenu .head { display: flex; justify-content: space-between; gap: 10px; margin: 0 2px 8px; color: var(--copper); }
+  .tiermenu .head span { color: var(--muted); text-transform: none; letter-spacing: 0.04em; }
+  .tiermenu .tier { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-bottom-width: 0; text-align: left; color: var(--ink); }
+  .tiermenu .tier:last-of-type { border-bottom-width: 1px; }
+  .tiermenu .tier .d { font: 500 10px/1.3 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tiermenu .tier .e { font: 500 11px/1 var(--mono); color: var(--text); }
+  .tiermenu .tier.on { background: var(--solid); color: var(--solid-text); }
+  .tiermenu .tier.on .d, .tiermenu .tier.on .e { color: var(--solid-text); }
+  .tiermenu .custom { margin-top: 6px; }
   .command .live { padding: 9px 12px 8px; }
   .command .live .nums b { font-size: 26px; }
   .command .live .spark { height: 22px; margin-top: 4px; }
@@ -488,8 +557,11 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .seg label { padding: 7px 10px; }
   dialog.modal td:first-child { width: 50%; white-space: normal; }
 }
+/* the tier menu exists only on the phone layout */
+@media (min-width: 961px) { .tiermenu { display: none !important; } }
 @media (max-width: 400px) {
   .brand .chip { display: none; }
+  .runsplit .btn.menu { padding: 0 9px 0 11px; gap: 7px; }
   .zoombar { gap: 6px; }
   .zoombar .tools { gap: 4px; }
   .zoombar .tools .textbtn { padding: 0 5px; }
@@ -511,7 +583,8 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   body.left-closed .zoombar { left: 50% !important; }
   .statusbar .notice { left: calc(50% + 150px); max-width: min(420px, calc(100vw - 324px)); }
   body.left-closed .statusbar .notice { left: 50%; max-width: min(420px, calc(100vw - 24px)); }
-  .instrument { width: min(300px, 80vh); height: min(300px, 80vh); }
+  .instrument { top: 50%; width: min(300px, 80vh); height: min(300px, 80vh); }
+  .syscheck { left: auto; right: 12px; top: 56px; bottom: 12px; width: min(300px, calc(50vw - 162px)); max-height: none; transform: none; }
   body.entering .console { animation: slideL 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   body.leaving .console { animation: slideLout 0.4s cubic-bezier(0.6, 0, 0.9, 0.4) both; }
 }

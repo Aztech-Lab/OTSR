@@ -13,9 +13,11 @@ Three layers, from the specification down to the browser:
      against the golden data. One worker, files in sequence.
 3. **Browser smoke test** (`npm run build && npm run smoke`): drives the built app in headless Chrome through the
    `window.otsr` hook — loads a synthetic image, fits, exports, snapshots the three view modes — and writes the
-   snapshots to `tools/out/`.
-4. **Phone layout test** (`npm run build && npm run smoke:mobile`): three touch-emulated viewports (portrait phone,
-   sideways phone, tablet) — the start screen, an image, the sheet or the column, a two-finger pinch, a short fit, the
+   snapshots to `tools/out/`. `--vendor=nvidia` makes it stop unless the browser runs on that GPU.
+4. **Phone layout test** (`npm run build && npm run smoke:mobile`): four touch-emulated viewports (a 3× portrait
+   phone, a narrow phone, a sideways phone, a tablet) — the first-visit tier (Fast on phones) and the viewer at most at
+   2× device pixels, the start screen with its system check, an image, the split run button with its tier menu and the
+   strip under it, a Turbo fit without the animation, the sheet or the column, a two-finger pinch, a short fit, the
    menus and dialogs, the report page. Every floating element must stay inside the viewport and nothing may scroll
    sideways; screenshots go to `tools/out/mobile/`. `--vendor=nvidia` makes it stop unless the browser runs on that
    GPU.

@@ -37,13 +37,15 @@ in the browser.
 
 1. **Image**: open a file, drop it on the view, or paste it from the clipboard. PNG, JPEG, WebP, AVIF, BMP and GIF
    (first frame) are decoded by the browser. Until a model exists the view shows the image with bicubic interpolation.
-2. **Quality**: *Fast* (1 Gaussian per 20 pixels, 1500 steps), *Standard* (1 per 10 pixels, 3000 steps — the
-   paper setting) or *Best* (1 per 7 pixels, 4000 steps). Below the choice: the Gaussian count, the GPU memory the fit
-   will take and, once one fit has run on this machine, the expected time. *Crisp edges at magnification* is the
-   distance-field edge pass; leave it on unless you want the plain Gaussian render.
+2. **Quality**: *Turbo* (1 Gaussian per 20 pixels, 400 steps, no fit animation), *Fast* (1 per 20 pixels,
+   1500 steps), *Standard* (1 per 10 pixels, 3000 steps — the paper setting) or *Best* (1 per 7 pixels, 4000 steps).
+   Phones start on Fast until a tier is picked. Below the choice: the Gaussian count, the GPU memory the fit will take
+   and, once one fit has run on this machine, the expected time.
 3. **Enhance** — the copper button at the top centre (`F` or Enter). While it runs, the button becomes a live
    readout: step, PSNR, iterations per second, time left and the PSNR curve; *Stop* (or Esc) keeps what has been
-   fitted so far. Then **Export** at 1×, 2×, 4×, 8×, 16× or any factor (the output size is shown under each choice)
+   fitted so far. Then, under Output, *Crisp edges* — the distance-field edge pass at magnification; leave it on
+   unless you want the plain Gaussian render — and **Export** at 1×, 2×, 4×, 8×, 16× or any factor (the output size is
+   shown under each choice)
    as PNG, JPEG, WebP, AVIF or BMP — the ▾ next to the button opens the format menu with a quality slider for the
    lossy formats; a format this browser cannot encode is greyed out (AVIF in most browsers today) — or **Save model**
    (`.otsr`, 36 bytes per Gaussian) to re-open later with *Load model…* without a new fit. Clicking the **OTSR**
@@ -97,13 +99,29 @@ structure view, fit curves); the CHANGELOG lists what is in.
 
 ## On a phone or a small tablet
 
-Below 960 px the layout changes. The console is a sheet at the bottom of the screen: tap its title bar (the chevron)
-to open or fold it. It folds by itself when an image arrives and while a fit runs — the picture is the point then —
-and opens afterwards on the result and the export controls. The action stays at the top, the zoom bar sits on the
-sheet. Pinch with two fingers to zoom, drag to pan, double-tap to fit the image. Held sideways, the console is a
-column on the left that closes to a tab on the edge. The monitor panel, the pixel rulers' readout and the status strip
-are not shown on phones; notices appear above the zoom bar. Fits run on the phone's own GPU and take correspondingly
-longer: start with the *Fast* preset.
+Below 960 px the layout changes. The action at the top is a split button: **Enhance**, and next to it the tier with
+its estimated time. Its menu lists Turbo, Fast, Standard and Best with what each costs for the open image (in research
+mode also the custom budget, the steps and the pixel loss). Under it a strip shows the image, its Gaussians, the GPU
+memory and the state — the PSNR once fitted. The console is a sheet at the bottom of the screen with the output, the
+export and the process log: tap its title bar (the chevron) to open or fold it. It folds by itself when an image
+arrives and while a fit runs — the picture is the point then — and opens afterwards on the result and the export
+controls. The zoom bar sits on the sheet. Pinch with two fingers to zoom, drag to pan, double-tap to fit the image.
+Held sideways, the console is a column on the left that closes to a tab on the edge. The monitor panel, the pixel
+rulers' readout and the status strip are not shown on phones; notices appear above the zoom bar.
+
+Fits run on the phone's own GPU and take correspondingly longer. Phones start on *Fast*; *Turbo* is about four times
+quicker and skips the fit animation. To spare the phone, the view is drawn at most at twice its CSS resolution and the
+starlight holds still while a fit runs.
+
+## The system check
+
+The start screen shows what the page found on this machine. First the verdict — *Ready*, *Limited* (WebGPU works,
+but the GPU allows only small buffers) or *Slow* (a software adapter) — and what it means: the largest image one fit
+can take at Fast and at Standard and, once a fit has run here, the measured speed and the time the sample takes. Then
+the facts: the browser and system, the GPU (its model, vendor and architecture), its memory, the buffer limits, the
+optional features, the CPU threads and the screen. Browsers do not tell a page how much memory the GPU has; the card
+says so and shows the system memory instead (phones, Apple and Intel integrated GPUs share it with the GPU), and the
+driver's memory heaps where Chrome's WebGPU developer flag is on. Nothing of this leaves the page.
 
 The **technical report** (`report.html`, from the start screen, the chip next to the version badge or the settings)
 tells the method behind the app in plain words, with nine live demonstrations, what the app does and how the

@@ -1,5 +1,10 @@
 # Troubleshooting
 
+The start screen's **system check** tells whether WebGPU works here, which GPU the browser gave the page and the
+largest image one fit can take. When WebGPU does not start at all, the full-screen notice lists the browser, whether
+the page is secure (https or localhost), whether the WebGPU API exists, what the adapter request answered and the GPU
+that WebGL reports; the causes below map to those lines.
+
 ## "WebGPU is not available in this browser"
 
 `navigator.gpu` does not exist. Update the browser (Chrome/Edge 113+, Safari 26+, Firefox 141+ on Windows) or
@@ -17,9 +22,17 @@ The browser has WebGPU but no usable GPU. Causes:
 - remote desktop sessions and some virtual machines expose no GPU;
 - a transient failure right after the browser started: reload the page (the app already retries a few times).
 
+## The system check says the GPU memory is "not reported by browsers"
+
+That is expected: browsers do not give pages the size of the GPU memory, as it would help to identify the machine.
+The card shows the system memory instead (Chrome and Edge report it rounded and at most 8 GB), which is the GPU's
+memory too on phones, Apple computers and Intel integrated GPUs, and the largest buffer the GPU allows, which bounds
+the image one fit can take. In Chrome, `chrome://flags/#enable-webgpu-developer-features` lets the page read the
+driver's memory heaps; the card then shows the GPU memory.
+
 ## The wrong GPU is used (laptops and desktops with two GPUs)
 
-The header shows which adapter runs OTSR. On Windows, Chrome ignores the "high-performance" request
+The system check on the start screen and the status strip show which adapter runs OTSR. On Windows, Chrome ignores the "high-performance" request
 ([crbug.com/369219127](https://crbug.com/369219127)) and uses the GPU that drives the display; on a machine whose
 monitor is connected to the integrated GPU, WebGPU therefore runs on the integrated GPU even if a discrete one is
 installed. To use the discrete GPU:

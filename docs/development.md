@@ -14,7 +14,7 @@ data.
 | `npm run serve` | serves `dist/` (what `serve.bat` runs) |
 | `npm test` / `npm run test:gpu` / `npm run test:all` | unit / GPU / both |
 | `npm run smoke` | browser smoke test of `dist/` |
-| `npm run smoke:mobile` | phone / tablet layout test of `dist/` (touch emulation, three viewports, the report page) |
+| `npm run smoke:mobile` | phone / tablet layout test of `dist/` (touch emulation, four viewports, the report page) |
 | `npm run bench -- image.rgb.bin --adapter=4090` | end-to-end timing in Node (see performance.md) |
 | `npm run golden` | regenerate `tests/golden/` from the Python reference |
 | `npm run probe:dawn` / `npm run probe:webgpu` | adapter probes for Node (Dawn) / headless Chrome |
@@ -42,7 +42,9 @@ src/app/actions.ts        the operations behind the buttons (open, fit, export, 
 src/app/panel.ts          the side panel for the current mode (simple / research), kept in sync with the store
 src/app/viewer.ts         WebGPU canvas + 2-D overlay: pan / zoom, split comparison, hold-to-peek, region tool
 src/app/roi.ts            the shared region-of-interest model (drawing, editing, clamping)
-src/app/presets.ts        quality presets and the time / memory estimates
+src/app/presets.ts        the quality tiers, the time / memory estimates and the largest image a device's buffers allow
+src/app/hardware.ts       the system check of the start screen (browser, GPU, limits, verdict) and the phone test
+src/app/tiermenu.ts       the tier menu of the split run button (phone layout)
 src/app/shortcuts.ts      keyboard shortcuts;  toast.ts: notifications;  dom.ts: h(), bilingual labels, formats;  image.ts: decoding, PNG, downloads
 src/tokens.css            design tokens and base elements, shared by the app (style.css) and the report (report.css)
 report.html, src/report.ts the technical report page (second Vite entry)

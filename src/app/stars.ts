@@ -1,7 +1,7 @@
 // Starlight over the stage in the copper of the theme, deep-space style: a few huge, very soft glows (hundreds of
 // pixels across) drifting slowly and breathing, a layer of medium soft stars that twinkle, some with long soft
 // flares, and a sprinkling of tiny sharp points for depth. 2-D canvas at CSS resolution, 30 fps, a static frame
-// when motion is off.
+// when motion is off; `paused` holds the last frame (phones, while a job runs).
 
 type Kind = 'glow' | 'star' | 'point';
 
@@ -52,7 +52,7 @@ export class Stars {
   private wasMoving = true;
   private wasEnabled = true;
 
-  constructor(readonly canvas: HTMLCanvasElement, private readonly motion: () => boolean, private readonly enabled: () => boolean = () => true) {
+  constructor(readonly canvas: HTMLCanvasElement, private readonly motion: () => boolean, private readonly enabled: () => boolean = () => true, private readonly paused: () => boolean = () => false) {
     const g = canvas.getContext('2d');
     if (!g) throw new Error('2D background unavailable');
     this.g = g;
@@ -94,6 +94,7 @@ export class Stars {
       return;
     }
     if (!this.wasEnabled) { this.wasEnabled = true; this.wasMoving = true; this.last = 0; }
+    if (this.paused()) { this.last = 0; this.schedule(); return; }
     const moving = this.motion();
     if (moving) {
       if (t - this.last >= 1000 / FPS) { const dt = this.last ? Math.min(0.1, (t - this.last) / 1000) : 0; this.last = t; this.draw(t / 1000, dt); }

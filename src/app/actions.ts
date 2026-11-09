@@ -9,7 +9,7 @@ import type { Monitor } from './monitor';
 import type { VectorView } from './vectorview';
 import { EXPORT_FORMATS, MAX_PIXELS, WARN_PIXELS, decodeImageFile, downloadBlob, encodeImage, imageFromRgba8, stem, type ExportFormat, type LoadedImage } from './image';
 import type { JobRunner } from './jobs';
-import { effectiveSettings, gaussianCount } from './presets';
+import { effectiveSettings, fitAnimates, gaussianCount } from './presets';
 import { defaultRoi } from './roi';
 import type { AppModel, FitSummary, Layers, Store } from './store';
 import { toast } from './toast';
@@ -118,7 +118,7 @@ export class Actions {
     const K = gaussianCount(kPerPx, img.W, img.H);
     const loss = s.state.prefs.loss ?? 'l2';
     const prefs = s.state.prefs;
-    const show = prefs.fitAnim !== false && prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches ? this.show : null;
+    const show = fitAnimates(prefs) ? this.show : null; // Turbo, the setting or reduced motion: the live render only
     this.vectorView?.release();
     s.set({ live: null, curve: [], errorStats: null, monitor: true, fitEntries: 0, layers: { ...s.state.layers, vector: false } });
     this.viewer.layers = { ...this.viewer.layers, vector: false };
@@ -152,15 +152,18 @@ export class Actions {
         progress(-1, `Optimising · ${fmtInt(steps)} steps · progress every 50 steps`);
         this.viewer.compare = s.state.prefs.compare === 'split';
         this.viewer.requestRender();
-        // the monitor's crops follow the optimiser at a fixed cadence
+        // the monitor's crops follow the optimiser at a fixed cadence; the wait is cut short when the fit ends (it used
+        // to finish its 600 ms first, a pause after every fit)
         let fitting = true;
+        let wake: (() => void) | null = null;
         const snapLoop = (async () => {
           while (fitting) {
-            await new Promise((r) => setTimeout(r, SNAPSHOT_MS));
+            await new Promise<void>((r) => { const t = setTimeout(r, SNAPSHOT_MS); wake = () => { clearTimeout(t); r(); }; });
             if (!fitting || s.state.model !== model) break;
             await this.monitor?.renderCrops();
           }
         })();
+        const stopSnaps = async () => { fitting = false; (wake as (() => void) | null)?.(); await snapLoop; };
         const res = await runFit(this.ctx, this.pipes, { buffer: model.params, count: model.N }, img.W, img.H, img.rgba, {
           steps,
           logEvery: 50,
@@ -174,9 +177,7 @@ export class Actions {
             s.set({ live: { step: p.step, steps: p.steps, psnr: p.psnr, rate, left }, curve: [...s.state.curve, { step: p.step, psnr: p.psnr }] });
             this.viewer.requestRender();
           },
-        });
-        fitting = false;
-        await snapLoop;
+        }).finally(stopSnaps); // a failed fit stops the crops too
         if (s.state.model !== model) return { psnr: 0, seconds: res.seconds, steps: 0, count: model.N, cancelled: true }; // replaced meanwhile
         const last = res.curve[res.curve.length - 1];
         model.cpu = res.params;

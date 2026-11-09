@@ -22,7 +22,10 @@ const REVEAL_MS = 1300;
 const RENDER_INTERVAL_MS = 40; // live render cadence in phase 2 (the optimiser keeps running meanwhile)
 const RENDER_INTERVAL_COMPACT_MS = 90; // on phones the fit itself needs the GPU more
 const MAX_NODES = 110; // mesh nodes per axis (subsampled)
+const MAX_NODES_COMPACT = 40; // on phones: an eighth of the nodes, still a dense mesh on a small screen
 const FLICKER_MS = 90;
+const LATTICE_FRAME_MS = 33; // the mesh is redrawn at most ~30 times a second: each overlay frame costs the fit time
+const FLICKER_LEVELS = 4; // node brightness levels: one fill per level instead of two per node
 const FX_BYTES = 32;
 
 interface Grid { ny: number; nx: number }
@@ -67,6 +70,7 @@ export class FitShow {
   private bg: GPUBindGroup | null = null;
   private seed = 0;
   private raf = 0;
+  private lastLatticeFrame = 0;
   private colour = '#b8793c';
   private colour2 = '#d9a25f';
   private paper = '#ebebe8';
@@ -102,6 +106,8 @@ export class FitShow {
     this.playStart = performance.now();
     this.viewer.curtain = true;
     this.viewer.painter = (g, t, dpr) => this.paint(g, t, dpr);
+    // between the mesh fading out and the scan line, the overlay is blank
+    this.viewer.painterBlank = () => this.phase === 'paint' && performance.now() - this.paintStart >= MESH_FADE_MS;
     this.viewer.requestRender();
     document.body.classList.add('fitshow');
     this.loop();
@@ -195,6 +201,7 @@ export class FitShow {
     this.releaseModel();
     this.viewer.curtain = false;
     this.viewer.painter = null;
+    this.viewer.painterBlank = null;
     this.viewer.requestRender();
     document.body.classList.remove('fitshow');
     const r = this.resolveFinish;
@@ -240,9 +247,12 @@ export class FitShow {
       this.advance(now);
       if (this.active) {
         const interval = matchMedia('(max-width: 960px)').matches ? RENDER_INTERVAL_COMPACT_MS : RENDER_INTERVAL_MS;
-        if (this.phase === 'lattice') this.viewer.refreshOverlay();
-        else if (now - this.lastRender >= interval) { this.lastRender = now; this.viewer.requestRender(); }
-        else this.viewer.refreshOverlay();
+        if (this.phase === 'lattice') {
+          if (now - this.lastLatticeFrame >= LATTICE_FRAME_MS) { this.lastLatticeFrame = now; this.viewer.refreshOverlay(); }
+        } else if (now - this.lastRender >= interval) { this.lastRender = now; this.viewer.requestRender(); }
+        // the mesh fades out with the renders (each redraws the overlay); only the scan line, after the fit, moves every
+        // frame: a 2-D overlay changed at the display rate held the fit underneath at a third of its speed
+        else if (this.phase === 'reveal') this.viewer.refreshOverlay();
         this.loop();
       }
     });
@@ -324,7 +334,8 @@ export class FitShow {
     const a = Math.floor(idx), f = idx - a;
     const A = this.stages[a], B = this.stages[Math.min(this.stages.length - 1, a + 1)];
     const { ny, nx } = this.grid;
-    const step = Math.max(1, Math.ceil(Math.max(nx, ny) / MAX_NODES));
+    const compact = matchMedia('(max-width: 960px)').matches;
+    const step = Math.max(1, Math.ceil(Math.max(nx, ny) / (compact ? MAX_NODES_COMPACT : MAX_NODES)));
     const z = t.zoom * this.L;
     const ox = t.offsetX, oy = t.offsetY;
     const px = (k: number) => ox + (A[2 * k] + (B[2 * k] - A[2 * k]) * f) * z;
@@ -340,23 +351,33 @@ export class FitShow {
       }
     }
     g.strokeStyle = this.colour;
-    g.lineWidth = 1 * dpr;
-    g.globalAlpha = alpha * (this.dark ? 0.32 : 0.28);
+    // hairlines (one canvas pixel) take the fast path of the 2-D canvas; on phones' 2x canvases a little stronger
+    g.lineWidth = 1;
+    g.globalAlpha = alpha * (this.dark ? 0.32 : 0.28) * (dpr > 1.25 ? 1.5 : 1);
     g.stroke(path);
+    // flickering nodes: every node falls in one of a few brightness levels (re-drawn every FLICKER_MS), and each level
+    // is one path of small squares: two fills per level instead of two fillRect calls per node
     const bucket = Math.floor(now / FLICKER_MS);
     const core = this.dark ? this.colour2 : this.colour;
+    const glows = Array.from({ length: FLICKER_LEVELS }, () => new Path2D());
+    const cores = Array.from({ length: FLICKER_LEVELS }, () => new Path2D());
     for (let i = 0; i < ny; i += step) {
       for (let j = 0; j < nx; j += step) {
         const k = i * nx + j;
         const x = px(k), y = py(k);
-        const fl = 0.35 + 0.65 * hash(k * 31 + bucket * 7);
-        g.globalAlpha = alpha * 0.18 * fl;
-        g.fillStyle = this.colour2;
-        g.fillRect(x - 3 * dpr, y - 3 * dpr, 6 * dpr, 6 * dpr);
-        g.globalAlpha = alpha * fl;
-        g.fillStyle = core;
-        g.fillRect(x - 1 * dpr, y - 1 * dpr, 2 * dpr, 2 * dpr);
+        const lv = Math.min(FLICKER_LEVELS - 1, Math.floor(hash(k * 31 + bucket * 7) * FLICKER_LEVELS));
+        glows[lv].rect(x - 3 * dpr, y - 3 * dpr, 6 * dpr, 6 * dpr);
+        cores[lv].rect(x - 1 * dpr, y - 1 * dpr, 2 * dpr, 2 * dpr);
       }
+    }
+    for (let lv = 0; lv < FLICKER_LEVELS; lv++) {
+      const fl = 0.35 + 0.65 * ((lv + 0.5) / FLICKER_LEVELS);
+      g.globalAlpha = alpha * 0.18 * fl;
+      g.fillStyle = this.colour2;
+      g.fill(glows[lv]);
+      g.globalAlpha = alpha * fl;
+      g.fillStyle = core;
+      g.fill(cores[lv]);
     }
     g.restore();
   }

@@ -45,8 +45,18 @@
 
   <div id="command" class="float command">
     <div id="cmd-idle">
-      <button id="cmd-fit" class="btn copper big" title="Fit the Gaussians to the image (F)"><span id="cmd-fit-label" class="bi"><b>Enhance</b><small>增強</small></span><span class="arrow">▶</span></button>
+      <div class="runsplit">
+        <button id="cmd-fit" class="btn copper big" title="Fit the Gaussians to the image (F)"><span id="cmd-fit-label" class="bi"><b>Enhance</b><small>增強</small></span><span class="arrow">▶</span></button>
+        <button id="cmd-tier" class="btn copper menu" title="Tier · 檔位" aria-haspopup="true" aria-expanded="false"><span class="bi"><b id="cmd-tier-en">Fast</b><small id="cmd-tier-zh">快速</small></span><span class="arrow">▾</span></button>
+      </div>
+      <div id="tier-menu" class="tiermenu" hidden></div>
       <div class="micro" id="cmd-sub"></div>
+      <div id="cmd-info" class="cmdinfo" aria-live="polite">
+        <div class="readout src"><div class="k" id="ci-size">Source</div><div class="v" id="ci-name">—</div></div>
+        <div class="readout"><div class="k">Gaussians</div><div class="v" id="ci-count">—</div></div>
+        <div class="readout"><div class="k">GPU mem</div><div class="v" id="ci-mem">—</div></div>
+        <div class="readout state"><div class="k" id="ci-state-k">State</div><div class="v" id="ci-state">—</div></div>
+      </div>
     </div>
     <div id="cmd-live" class="live" hidden>
       <div class="head"><span class="micro"><span class="sq blink"></span>&nbsp; <span id="live-title">Fitting</span></span><span class="micro" id="live-step"></span></div>
@@ -95,13 +105,13 @@
     <span class="corner-note br" id="corner-gpu">GPU: —</span>
   </section>
   <div id="boot" class="float bootlog" aria-hidden="true"></div>
+  <section id="syscheck" class="float syscheck" aria-label="System check" hidden></section>
 
   <aside id="inspector" class="float console" aria-label="Controls">
     <div class="console-head">
       <span id="console-title">Control</span>
-      <div class="headseg" id="mode-head" role="radiogroup" aria-label="Mode · 模式"></div>
       <span class="hatch"></span>
-      <span id="console-state"><span class="sq ok"></span> idle</span>
+      <div class="headseg" id="mode-head" role="radiogroup" aria-label="Mode · 模式"></div>
       <button id="console-toggle" class="sheet-toggle" title="Collapse / expand · 收起 / 展開" aria-label="Collapse or expand the controls"><i>⌄</i></button>
     </div>
     <div id="panel" class="console-body"></div>
@@ -140,7 +150,7 @@
   </div>
 
   <footer class="float statusbar">
-    <span><i id="status-dot" class="sq ok"></i>&nbsp; Status</span>
+    <span class="state"><i id="status-dot" class="sq ok"></i>&nbsp; <span id="status-state">Idle</span></span>
     <span class="fill" id="status"></span>
     <span class="notice" id="notice" role="status" aria-live="polite" hidden></span>
     <span class="seg-count" id="seg-count" aria-hidden="true"></span>
@@ -153,6 +163,7 @@
     <div class="card">
       <h2>WebGPU unavailable</h2>
       <p id="nogpu-msg"></p>
+      <dl id="nogpu-diag" class="diag"></dl>
       <p>OTSR needs WebGPU: Chrome 113+, Edge 113+ or Safari 26+ on a machine with a GPU, served over http(s). On computers with two GPUs make sure the browser uses the dedicated one — see <a href="docs/troubleshooting.md">troubleshooting</a>.</p>
       <button class="btn solid" onclick="location.reload()"><span class="bi"><b>Reload</b><small>重新載入</small></span><span class="arrow">↻</span></button>
     </div>

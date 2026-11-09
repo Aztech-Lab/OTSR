@@ -23,6 +23,8 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const url = `http://127.0.0.1:${server.address().port}/`;
 const headful = process.argv.includes('--headful');
+/** --vendor=nvidia: stop unless the browser's adapter is that vendor's (never run on an unverified GPU). */
+const VENDOR = process.argv.find((a) => a.startsWith('--vendor='))?.slice(9) ?? '';
 const browser = await puppeteer.launch({ executablePath: findBrowser(), headless: !headful, args: [...webgpuArgs(), '--window-size=1400,900'], defaultViewport: { width: 1400, height: 900 } });
 const t0 = performance.now();
 try {
@@ -32,6 +34,7 @@ try {
   await page.goto(url);
   await page.waitForFunction('window.otsr !== undefined', { timeout: 30000 });
   const adapter = await page.evaluate(() => window.otsr.state().adapter);
+  if (VENDOR && adapter.vendor !== VENDOR) throw new Error(`adapter vendor ${adapter.vendor} is not ${VENDOR}: stopping`);
   console.log(`adapter: ${adapter.description} (${adapter.vendor} ${adapter.architecture})${adapter.isFallback ? ' FALLBACK' : ''}`);
   // a 120 x 80 synthetic image: gradient background, two discs, a dark box, a thin diagonal line
   await page.evaluate(() => {

@@ -17,7 +17,7 @@ export interface ViewerModel {
   params: GPUBuffer;
   /** CPU copy of the parameters when available (the Gaussian outline layer reads it). */
   cpu?: Float32Array | null;
-  /** The transport map of the initialisation, for the OT lattice layer. */
+  /** The transport map of the initialisation, for the OT mesh layer. */
   ot?: { T: Float32Array; grid: { ny: number; nx: number } } | null;
 }
 
@@ -28,7 +28,7 @@ export interface ViewerLayers {
   error: boolean;
   /** Gaussian-id colours (handled by the recolour hook, not the overlay). */
   vector: boolean;
-  /** The optimal-transport lattice of the initialisation. */
+  /** The optimal-transport mesh of the initialisation. */
   ot: boolean;
 }
 
@@ -88,6 +88,10 @@ export class Viewer {
   curtain = false;
   /** Replaces the overlay layers while set (the fit animation); the region markers are drawn on top of it. */
   painter: ((g: CanvasRenderingContext2D, t: RoiTransform, dpr: number) => void) | null = null;
+  /** True while the painter has nothing to draw: a blank overlay is then left untouched. */
+  painterBlank: (() => boolean) | null = null;
+  /** The overlay canvas holds nothing (set when it was cleared for a blank painter). */
+  private overlayBlank = false;
   /** Labelled boxes in source pixels (the monitor's active regions). */
   markers: { x: number; y: number; w: number; h: number; label: string; score: number }[] = [];
   /** Extra compute work encoded before every model render (the fit animation refreshes its recoloured copy). */
@@ -138,12 +142,15 @@ export class Viewer {
   private errorMap: ImageBitmap | null = null;
   private sweep: number | null = null;
   private hoverOn = false;
-  private readonly dpr = window.devicePixelRatio || 1;
+  /** Canvas pixels per CSS pixel: the screen's ratio, at most `maxDpr` (2 on phones, where a 3x screen would
+   * triple the pixels of every render and of the canvas-sized buffers for little visible gain). */
+  readonly dpr: number;
 
   /** Receives the pointer events (the whole stage, so panning and zooming work anywhere, not only over the image). */
   readonly input: HTMLElement;
 
-  constructor(readonly canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, readonly ctx: GpuContext, readonly pipes: Pipelines, input?: HTMLElement) {
+  constructor(readonly canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, readonly ctx: GpuContext, readonly pipes: Pipelines, input?: HTMLElement, opts: { maxDpr?: number } = {}) {
+    this.dpr = Math.min(window.devicePixelRatio || 1, opts.maxDpr ?? Infinity);
     this.input = input ?? canvas;
     this.device = ctx.device;
     this.overlay = overlay;
@@ -488,9 +495,14 @@ export class Viewer {
   private drawOverlay(): void {
     const g = this.g2d;
     const dpr = this.dpr;
+    // every change of the 2-D overlay costs the browser a composited canvas frame; while the fit animation has nothing
+    // on it, a blank overlay stays untouched (redrawing it on every render slowed the fit underneath about 2x)
+    const blank = !!this.painter && !this.markers.length && (this.painterBlank?.() ?? false);
+    if (blank && this.overlayBlank) return;
+    this.overlayBlank = blank;
     g.clearRect(0, 0, this.width, this.height);
     const t = this.transform();
-    if (!t) return;
+    if (!t || blank) return;
     if (this.painter) {
       this.painter(g, t, dpr);
       this.drawMarkers(g, dpr);

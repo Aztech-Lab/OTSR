@@ -1,11 +1,13 @@
 // The application state: one store, one subscribe. Preferences persist in localStorage (best effort).
 
 import type { AdapterInfo } from '../engine';
+import { isPhone } from './hardware';
 import type { ExportFormat, LoadedImage } from './image';
 import type { Roi } from './roi';
 
 export type Mode = 'simple' | 'research';
-export type Preset = 'fast' | 'standard' | 'best' | 'custom';
+export type Preset = 'turbo' | 'fast' | 'standard' | 'best' | 'custom';
+const PRESET_KEYS: readonly Preset[] = ['turbo', 'fast', 'standard', 'best', 'custom'];
 export type Theme = 'auto' | 'light' | 'dark';
 export type CompareMode = 'off' | 'split';
 export type ViewMode = 'otsr' | 'raw' | 'bicubic' | 'bilinear' | 'nearest';
@@ -17,7 +19,7 @@ export interface Layers {
   error: boolean;
   /** The model in Gaussian-id colours (random colour x luma per Gaussian). */
   vector: boolean;
-  /** The optimal-transport lattice of the initialisation over the image. */
+  /** The optimal-transport mesh of the initialisation over the image. */
   ot: boolean;
 }
 
@@ -55,6 +57,8 @@ export interface ErrorStats {
 export interface Prefs {
   mode: Mode;
   preset: Preset;
+  /** The tier was picked by hand (until then phones start on Fast, other devices on Standard). */
+  presetChosen: boolean;
   kPerPx: number;
   steps: number;
   edges: boolean;
@@ -68,7 +72,7 @@ export interface Prefs {
   compareWith: 'bicubic' | 'bilinear' | 'nearest';
   theme: Theme;
   motion: boolean;
-  /** The fit animation (OT lattice, watercolour, scan reveal); off = live render while fitting. */
+  /** The fit animation (OT mesh, watercolour, scan reveal); off = live render while fitting. */
   fitAnim: boolean;
   /** The starlight over the stage. */
   stars: boolean;
@@ -139,6 +143,7 @@ export interface AppState {
 export const DEFAULT_PREFS: Prefs = {
   mode: 'simple',
   preset: 'standard',
+  presetChosen: false,
   kPerPx: 0.1,
   steps: 3000,
   edges: true,
@@ -163,12 +168,20 @@ const PREFS_KEY = 'otsr.prefs.v1';
 function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return { ...DEFAULT_PREFS };
+    if (!raw) return phoneDefaults({ ...DEFAULT_PREFS, sections: {} });
     const p = JSON.parse(raw) as Partial<Prefs>;
-    return { ...DEFAULT_PREFS, ...p, sections: { ...(p.sections ?? {}) } };
+    return phoneDefaults({ ...DEFAULT_PREFS, ...p, sections: { ...(p.sections ?? {}) } });
   } catch {
-    return { ...DEFAULT_PREFS };
+    return phoneDefaults({ ...DEFAULT_PREFS });
   }
+}
+
+/** Phones start on Fast until a tier is picked by hand (a custom setting of research mode is kept); an unknown
+ * stored tier falls back to the default. */
+function phoneDefaults(p: Prefs): Prefs {
+  if (!PRESET_KEYS.includes(p.preset)) p.preset = DEFAULT_PREFS.preset;
+  if (!p.presetChosen && p.preset !== 'custom' && isPhone()) p.preset = 'fast';
+  return p;
 }
 
 type Listener = (state: AppState, changed: Set<keyof AppState>) => void;

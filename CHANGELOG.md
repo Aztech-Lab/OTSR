@@ -2,7 +2,47 @@
 
 ## 0.1.4 — 2026-11-09
 
-The technical report, rewritten as a magazine would tell it; the transport lattice is now called the mesh.
+Phones first, part two — a quicker tier, the tier in the run button, a system check on the start screen, a fit
+animation that no longer slows the fit — and the technical report, rewritten as a magazine would tell it.
+
+In the app:
+
+- **A Turbo tier** (極速): the budget of Fast (1 Gaussian per 20 px) with 400 steps instead of 1500, and no fit
+  animation, whose fixed timeline would otherwise be most of the wait. On the RTX 4090 (Dawn in Node) the sample
+  (1024 × 815) fits in 0.11 s at 40.5 dB (Fast: 0.53 s, 43.4 dB) and a 2048 × 2048 anime frame in 0.53 s at 49.0 dB
+  (Fast: 2.17 s, 50.1 dB). Halving the budget instead loses more and gains little, because a step costs mostly per
+  pixel. The tiers are Turbo / Fast / Standard / Best on every layout; docs/performance.md has all four.
+- **Phones start on Fast** until a tier is picked by hand (a phone: a touch screen whose short side is under 600 px;
+  a custom setting of research mode is kept).
+- **The run button is a split button on phones**: Enhance, and next to it the tier with its estimated time. Its menu
+  lists the four tiers with what each costs for the open image (Gaussians, steps, and the time once this device has
+  been measured); in research mode also the custom budget, the steps and the pixel loss. Under it, a strip of
+  readouts in the style of the console's Source boxes: the source (name and size), its Gaussians, the GPU memory and
+  the state (Idle, or Fitted with the PSNR). The sheet therefore opens on the output — scale, *Crisp edges*, export,
+  save / load. *Crisp edges* (and the edge width of research mode) now belong to Output on every layout.
+- **A system check on the start screen** (硬體檢測; bottom right on computers, under the instrument on phones, beside
+  it when held sideways): whether WebGPU works here (*Ready*, *Limited*, *Slow*) and what that means — the largest
+  image one fit can take at Fast and at Standard, and, once a fit has run, the measured speed and the time the
+  sample takes — then the facts behind it: the browser and system, the GPU (model, vendor, architecture), its memory,
+  the buffer limits, the optional features, the CPU threads and the screen. Browsers do not report the size of the GPU
+  memory; the card says so and shows the system memory (which phones, Apple and Intel integrated GPUs share with the
+  GPU), and the driver's memory heaps where Chrome's WebGPU developer flag exposes them. The boot log adds a SYSTEM
+  CHECK line. When WebGPU does not start at all, the notice lists the browser, whether the page is secure, whether the
+  API exists, what the adapter request answered and the GPU that WebGL sees.
+- **The state of the work moved to the status strip** (■ Idle / Running / Fitted at the bottom left; in the strip
+  under the action on phones), and the mode switch took its place at the right of the console's title bar, framed and
+  larger.
+- **Less work on phones**: the viewer draws at most 2 canvas pixels per CSS pixel (a 3× screen rendered 2.25 times
+  the pixels for little visible gain, and the canvas-sized buffers shrink with it), the starlight holds still while a
+  job runs, and a folded or closed console is not kept up to date until it opens.
+- **The fit animation no longer slows the fit.** Its mesh was stroked two canvas pixels wide on high-density screens,
+  a slow path of the 2-D canvas, and redrawn at the display rate: in headless Chrome the fit ran at about a third of
+  its speed while the mesh was on screen. The mesh is now drawn with hairlines and one fill per brightness level
+  instead of two per node, at most 30 times a second (on phones with 40 nodes per axis instead of 110), it fades out
+  with the renders, and the overlay is left alone while it is blank. The fit keeps its own pace under the animation;
+  on the phone layout the whole sample fit now finishes while the mesh is still settling.
+
+The technical report:
 
 - **The method in plain words.** `report.html` tells the whole story of the workshop paper behind the app — the
   problem, the picture made of Gaussians, where they should go, the transport, the solver, the re-layout, the
@@ -30,15 +70,29 @@ The technical report, rewritten as a magazine would tell it; the transport latti
   Sinkhorn–Knopp, Lloyd, EWA splatting, Keys, Lanczos, the WebGPU specifications — each with a line on why it is here.
 - The contents list scrolls on short windows; the report entry on the start screen sits under the pair.
 
-Found on the way: the barycentric transport map is pulled half a cell inward at the border of the box by the entropic
-blur, which left the outer band of a small picture without Gaussians; in the report's core the normal displacement now
-fades to zero at the edge of the box, as a transport of the box onto itself keeps its boundary (the app's engine is
-unchanged).
+Found on the way:
 
-Verified: build and type check; unit 9/9 (three new: exact gradients against central differences, max deviation
-1.1 × 10⁻¹⁰ against a gradient of 5.5 × 10⁻²; a fit from the transported mesh, 21.9 → 52.8 dB in 200 steps; the
-transport of a uniform and of a left-heavy density); GPU golden 8/8; the browser and phone suites; desktop and phone
-review shots of the report, the live strip run to the end, every demo mounted, no element outside the viewport.
+- After every fit the monitor's snapshot loop finished its 600 ms wait before the fit could end — up to 0.6 s added to
+  each fit, and after a failed fit the loop kept running. It now stops at once, also on failure.
+- docs/performance.md said that halving the budget roughly halves the fit time. On the RTX 4090 at 2048 × 2048,
+  halving it from 1/10 to 1/20 per pixel cuts the step time by about a fifth (1.78 → 1.45 ms); the page is corrected.
+- The barycentric transport map is pulled half a cell inward at the border of the box by the entropic blur, which
+  left the outer band of a small picture without Gaussians; in the report's core the normal displacement now fades to
+  zero at the edge of the box, as a transport of the box onto itself keeps its boundary (the app's engine is
+  unchanged).
+- The desktop smoke test now takes `--vendor=` like the phone test and stops on any other GPU.
+
+Verified: build and type check; unit 9/9 (three new for the report's core: exact gradients against central
+differences, max deviation 1.1 × 10⁻¹⁰ against a gradient of 5.5 × 10⁻²; a fit from the transported mesh,
+21.9 → 52.8 dB in 200 steps; the transport of a uniform and of a left-heavy density); GPU golden 8/8 (the engine is
+unchanged); the browser suite; the phone suite with four viewports, a 3× phone among them, and its new checks — the
+first-visit tier, the viewer at 2× on a 3× screen, the system check clear of the instrument, the wordmark and the
+navigation, the console opening on Output, the split button with its tier menu, a Turbo fit without the animation, the
+strip with the result (167 checks); desktop checks at 1600 × 1000 and 1280 × 720 — the system check clear of the
+instrument, the boot log and the status strip, the tiers, the state in the status strip, a Turbo fit, research mode,
+back home with the measured speed; review shots of the mesh animation in both themes; the tier timings on the
+RTX 4090; desktop and phone review shots of the report, the live strip run to the end, every demo mounted, no element
+outside the viewport.
 
 Each entry records what the version brought, how it was verified before release, and what was found and fixed on
 the way. Numbers are from the machines named; the engine (`src/engine`) is unchanged since 0.1.0 except where said.

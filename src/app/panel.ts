@@ -1,23 +1,22 @@
-// The console (left): numbered sections — source, preset, output, and in research mode view / region / session —
-// and the process log of the running / last job. Every control carries an English and a Traditional Chinese label.
-// The mode switch sits in the console's title bar and the fit button floats over the image (both in main.ts).
+// The console (left; a bottom sheet on phones): numbered sections — source, preset, output, and in research mode view /
+// region / session — and the process log of the running / last job. Every control carries an English and a
+// Traditional Chinese label. The mode switch sits in the console's title bar and the fit button floats over the image
+// (both in main.ts). On the phone layout the source moves into the strip under the run button and the tier into its
+// split menu (tiermenu.ts), so the sheet opens on the output. A folded or closed console is not kept up to date while
+// it is out of sight; it catches up when it opens.
 
 import { EDGE_PX } from '../core/spec';
 import type { Actions, SampleEntry } from './actions';
 import { bi, fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
 import { EXPORT_FORMATS, canEncode, type ExportFormat } from './image';
-import { effectiveSettings, fitMemoryBytes, fitSecondsEstimate, gaussianCount, viewMemoryBytes } from './presets';
+import { PRESETS, TIERS, effectiveSettings, fitSecondsEstimate, fmtSteps, gaussianCount, sessionMemory } from './presets';
 import type { AppState, Loss, Mode, Preset, Store, ViewMode } from './store';
 import type { Viewer } from './viewer';
 
 type Refresh = (s: AppState) => void;
 
-const PRESET_TEXT: Record<Preset, [string, string]> = {
-  fast: ['Fast', '快速 · 1/20 px · 1.5k'],
-  standard: ['Std', '標準 · 1/10 px · 3k'],
-  best: ['Best', '最佳 · 1/7 px · 4k'],
-  custom: ['Custom', '自訂 · manual'],
-};
+/** The tier buttons of the console: the short name and, under it, the Chinese name and the steps. */
+const tierText = (k: Preset): [string, string] => (k === 'custom' ? ['Custom', '自訂'] : [k === 'standard' ? 'Std' : PRESETS[k].label, `${PRESETS[k].zh} · ${fmtSteps(PRESETS[k].steps)}`]);
 const VIEW_TEXT: [ViewMode, string, string][] = [
   ['otsr', 'OTSR', '增強結果'],
   ['raw', 'Raw', '原始高斯'],
@@ -41,13 +40,25 @@ const px = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(Mat
 export class Panel {
   private refreshers: Refresh[] = [];
   private builtMode: Mode | null = null;
+  private builtCompact: boolean | null = null;
+  /** Changes arrived while the console was out of sight. */
+  private stale = false;
+  /** Ends the document listeners of the previous build (the console is rebuilt on mode and layout changes). */
+  private buildAbort: AbortController | null = null;
   private samples: SampleEntry[] = [];
+  /** The phone layout of style.css. */
+  private readonly compact = matchMedia('(max-width: 960px)');
 
   constructor(readonly root: HTMLElement, readonly store: Store, readonly actions: Actions, readonly viewer: Viewer) {
     store.subscribe((s, changed) => {
-      if (s.prefs.mode !== this.builtMode) this.build(s.prefs.mode);
-      else if ([...changed].some((k) => !IGNORED_KEYS.has(k)) || (changed.has('zoom') && s.layers.gaussians && this.builtMode === 'research')) for (const r of this.refreshers) r(s);
+      if (!(s.image || s.model) || s.prefs.panelLeft === false) { this.stale = true; return; } // out of sight
+      if (s.prefs.mode !== this.builtMode || this.compact.matches !== this.builtCompact) this.build(s.prefs.mode);
+      else if (this.stale || [...changed].some((k) => !IGNORED_KEYS.has(k)) || (changed.has('zoom') && s.layers.gaussians && this.builtMode === 'research')) {
+        this.stale = false;
+        for (const r of this.refreshers) r(s);
+      }
     });
+    this.compact.addEventListener('change', () => this.build(this.store.state.prefs.mode));
     void actions.sampleList().then((list) => {
       this.samples = list;
       if (list.length && this.builtMode === 'research') this.build('research');
@@ -57,7 +68,13 @@ export class Panel {
 
   private build(mode: Mode): void {
     this.builtMode = mode;
+    this.builtCompact = this.compact.matches;
+    this.stale = false;
+    this.buildAbort?.abort();
+    this.buildAbort = new AbortController();
+    const signal = this.buildAbort.signal;
     this.refreshers = [];
+    const compact = this.builtCompact;
     const a = this.actions;
     const s = this.store;
     const research = mode === 'research';
@@ -71,7 +88,9 @@ export class Panel {
       return [h('div', { class: 'readout' }, key, v), v, key] as const;
     };
 
-    // ---- 01 source --------------------------------------------------------------------------------------------
+    const sections: HTMLElement[] = [];
+    // ---- source (desktop) ---------------------------------------------------------------------------------------
+    if (!compact) {
     const fileInput = h('input', { type: 'file', accept: 'image/*,.otsr', hidden: true, onChange: () => { const f = fileInput.files?.[0]; if (f) void a.openAny(f); fileInput.value = ''; } });
     const fileName = h('div', { class: 'name' }, '—');
     const fileMeta = h('div', { class: 'meta' });
@@ -90,34 +109,29 @@ export class Panel {
       const mp = base ? (base.W * base.H) / 1e6 : 0;
       fileMeta.textContent = base ? `${st.image ? 'IMAGE' : 'MODEL'} // ${mp < 1 ? mp.toFixed(2) : mp.toFixed(1)} MP${st.model ? ' // FITTED' : ''}` : 'NO INPUT';
       vSize.textContent = base ? `${base.W}×${base.H}` : '—';
-      const { kPerPx } = effectiveSettings(st.prefs);
-      const N = st.model ? st.model.N : st.image ? gaussianCount(kPerPx, st.image.W, st.image.H) : 0;
-      vCount.textContent = N ? fmtInt(N) : '—';
-      if (base) {
-        const dpr = window.devicePixelRatio || 1;
-        const canvasPx = window.innerWidth * window.innerHeight * dpr * dpr;
-        const fit = fitMemoryBytes(N, base.W, base.H, st.fitEntries || undefined);
-        const view = viewMemoryBytes(N, base.W, base.H, canvasPx);
-        vMem.textContent = `${st.fitEntries ? '' : '≈'}${fmtBytes(fit + view)}`;
-        kMem.textContent = st.fitEntries ? 'GPU mem · fit' : 'GPU mem · est';
-        rMem.title = `fit buffers ${fmtBytes(fit)} (parameters, splats, gradient, Adam moments, ${st.fitEntries ? fmtInt(st.fitEntries) : '≈4 per Gaussian'} tile entries) + viewer ${fmtBytes(view)}`;
+      const mem = sessionMemory(st, window.innerWidth * window.innerHeight * this.viewer.dpr ** 2);
+      vCount.textContent = mem ? fmtInt(mem.N) : '—';
+      if (mem) {
+        vMem.textContent = `${mem.exact ? '' : '≈'}${fmtBytes(mem.bytes)}`;
+        kMem.textContent = mem.exact ? 'GPU mem · fit' : 'GPU mem · est';
+        rMem.title = `fit buffers ${fmtBytes(mem.fit)} (parameters, splats, gradient, Adam moments, ${st.fitEntries ? fmtInt(st.fitEntries) : '≈4 per Gaussian'} tile entries) + viewer ${fmtBytes(mem.view)}`;
       } else { vMem.textContent = '—'; kMem.textContent = 'GPU mem · est'; rMem.title = ''; }
     });
 
-    // ---- 02 preset ----------------------------------------------------------------------------------------------
-    const presetKeys: Preset[] = research ? ['fast', 'standard', 'best', 'custom'] : ['fast', 'standard', 'best'];
-    const presets = this.choices(presetKeys.map((k) => [k, PRESET_TEXT[k][0], PRESET_TEXT[k][1]] as const), (st) => st.prefs.preset, (k) => s.setPrefs({ preset: k }));
+    // ---- preset (desktop) ---------------------------------------------------------------------------------------
+    const presetKeys: Preset[] = research ? [...TIERS, 'custom'] : [...TIERS];
+    const presets = this.choices(presetKeys.map((k) => [k, ...tierText(k)] as const), (st) => st.prefs.preset, (k) => s.setPrefs({ preset: k, presetChosen: true }));
+    presets.querySelectorAll('button').forEach((b, i) => { const k = presetKeys[i]; b.title = k === 'custom' ? 'Your own budget and steps' : PRESETS[k].hint; });
     const custom = h('div', null,
-      this.numberField('Gaussians / px', '每像素高斯數', 'kPerPx', 0.005, 1, 0.01, (v) => s.setPrefs({ kPerPx: v, preset: 'custom' })),
-      this.numberField('Steps', '步數', 'steps', 10, 20000, 100, (v) => s.setPrefs({ steps: Math.round(v), preset: 'custom' })),
+      this.numberField('Gaussians / px', '每像素高斯數', 'kPerPx', 0.005, 1, 0.01, (v) => s.setPrefs({ kPerPx: v, preset: 'custom', presetChosen: true })),
+      this.numberField('Steps', '步數', 'steps', 10, 20000, 100, (v) => s.setPrefs({ steps: Math.round(v), preset: 'custom', presetChosen: true })),
     );
     const note = h('div', { class: 'note' });
     const preset = section('Preset', '檔位', presets, custom, note,
-      this.switchRow('Crisp edges', '銳利邊緣', 'distance-field edge pass at magnification', (st) => st.prefs.edges, (v) => { s.setPrefs({ edges: v }); this.viewer.edges = v; this.viewer.requestRender(); }),
-      research ? this.rangeField('Edge width', '邊緣寬度', 'edgePx', 0.4, 3, 0.1, 'px', (v) => { s.setPrefs({ edgePx: v }); this.viewer.edgePx = v; this.viewer.requestRender(); }) : null,
       research ? h('div', { class: 'field', style: 'grid-template-columns: 1fr 150px' }, h('span', null, 'Pixel loss', h('i', { class: 'zh' }, '像素損失')),
         this.choices(LOSS_TEXT, (st) => st.prefs.loss ?? 'l2', (k) => s.setPrefs({ loss: k }), 'small')) : null,
     );
+    sections.push(source, preset);
     this.refreshers.push((st) => {
       custom.hidden = !(research && st.prefs.preset === 'custom');
       const { kPerPx, steps } = effectiveSettings(st.prefs);
@@ -125,9 +139,10 @@ export class Panel {
       else if (st.image) {
         const N = gaussianCount(kPerPx, st.image.W, st.image.H);
         const sec = fitSecondsEstimate(st.prefs, N, steps);
-        note.textContent = `${fmtInt(N)} gaussians · ${fmtInt(steps)} steps${sec !== null ? ` · est. ${fmtSeconds(sec)}` : ''}${research && st.prefs.loss === 'l1' ? ' · L1' : ''}`;
+        note.textContent = `${fmtInt(N)} gaussians · ${fmtInt(steps)} steps${sec !== null ? ` · est. ${fmtSeconds(sec)}` : ''}${st.prefs.preset === 'turbo' ? ' · no animation' : ''}${research && st.prefs.loss === 'l1' ? ' · L1' : ''}`;
       } else note.textContent = 'budget and step count of the fit';
     });
+    }
 
     // ---- 03 output ----------------------------------------------------------------------------------------------
     const customScale = this.numberField('Custom scale', '自訂倍率', 'scale', 0.5, 32, 0.5, (v) => s.setPrefs({ scale: v }));
@@ -152,11 +167,14 @@ export class Panel {
         if (supported.get(f.key) === false) { b.disabled = true; b.querySelector('small')!.textContent = 'not in this browser'; b.title = `${f.label} encoding is not available in this browser`; }
       });
     });
-    document.addEventListener('pointerdown', (e) => { if (!exportMenu.hidden && !exportMenu.contains(e.target as Node) && !menuBtn.contains(e.target as Node)) exportMenu.hidden = true; });
+    document.addEventListener('pointerdown', (e) => { if (!exportMenu.hidden && !exportMenu.contains(e.target as Node) && !menuBtn.contains(e.target as Node)) exportMenu.hidden = true; }, { signal });
     const exportWrap = h('div', { class: 'exportwrap' }, h('div', { class: 'splitbtn' }, exportBtn, menuBtn), exportMenu);
     const saveBtn = h('button', { class: 'textbtn', onClick: () => a.saveModel() }, bi('Save model', '儲存模型'), h('span', { class: 'key' }, 'S'));
     const loadInput = h('input', { type: 'file', accept: '.otsr', hidden: true, onChange: () => { const f = loadInput.files?.[0]; if (f) void a.openModelFile(f); loadInput.value = ''; } });
-    const output = section('Output', '輸出', scales, customScale, exportWrap,
+    const output = section('Output', '輸出', scales, customScale,
+      this.switchRow('Crisp edges', '銳利邊緣', 'distance-field edge pass at magnification', (st) => st.prefs.edges, (v) => { s.setPrefs({ edges: v }); this.viewer.edges = v; this.viewer.requestRender(); }),
+      research ? this.rangeField('Edge width', '邊緣寬度', 'edgePx', 0.4, 3, 0.1, 'px', (v) => { s.setPrefs({ edgePx: v }); this.viewer.edgePx = v; this.viewer.requestRender(); }) : null,
+      exportWrap,
       h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, bi('Load model', '載入模型'), h('span', { class: 'arrow' }, '↗')), loadInput));
     let labelled: ExportFormat | null = null;
     this.refreshers.push((st) => {
@@ -172,7 +190,7 @@ export class Panel {
       saveBtn.disabled = !st.model?.cpu || !!st.job;
     });
 
-    const sections: HTMLElement[] = [source, preset, output];
+    sections.push(output);
 
     // ---- research: view, region, session ----------------------------------------------------------------------
     if (research) {

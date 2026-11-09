@@ -5,14 +5,16 @@ import { acquireDevice, createPipelines, renderImage, type GpuContext, type Pipe
 import { encodeOtsr } from '../core/fileformat';
 import { Actions } from './actions';
 import { Stars } from './stars';
-import { bi, fmtBytes, fmtInt, fmtSeconds, h, sparkline } from './dom';
+import { bi, fmtBytes, fmtCount, fmtInt, fmtSeconds, h, setText, sparkline } from './dom';
 import { FitShow } from './fitshow';
+import { hardwareReport, isPhone, noGpuDiagnosis, renderSyscheck, type HardwareReport } from './hardware';
 import { JobRunner } from './jobs';
 import { Monitor } from './monitor';
 import { Panel } from './panel';
-import { effectiveSettings, fitMemoryBytes, fitSecondsEstimate, gaussianCount } from './presets';
+import { PRESETS, effectiveSettings, fitMemoryBytes, fitSecondsEstimate, gaussianCount, sessionMemory } from './presets';
 import { SHORTCUTS, installShortcuts } from './shortcuts';
-import { Store, type Layers, type Mode, type Theme } from './store';
+import { Store, type AppState, type Layers, type Mode, type Theme } from './store';
+import { TierMenu } from './tiermenu';
 import { toast } from './toast';
 import { VectorView } from './vectorview';
 import { Viewer } from './viewer';
@@ -32,6 +34,10 @@ const COMPACT = matchMedia('(max-width: 960px)');
 const LANDSCAPE = matchMedia('(max-width: 960px) and (max-height: 520px) and (orientation: landscape)');
 /** Portrait phones and small tablets, where the sheet folds away while the image is the point. */
 const sheetLayout = () => COMPACT.matches && !LANDSCAPE.matches;
+/** A phone (hardware.ts): the viewer at most at 2x device pixels, the starlight still while a job runs. */
+const PHONE = isPhone();
+/** State keys the command block never shows (every pan and zoom frame changes `zoom`). */
+const COMMAND_IGNORED: ReadonlySet<keyof AppState> = new Set<keyof AppState>(['zoom', 'status', 'monitor', 'regions', 'roi', 'tool', 'errorStats']);
 /** Layout geometry of a fixed element without CSS transforms (the entering animation slides panels in). */
 const box = (el: HTMLElement) => ({ left: el.offsetLeft, top: el.offsetTop, right: el.offsetLeft + el.offsetWidth, bottom: el.offsetTop + el.offsetHeight, width: el.offsetWidth, height: el.offsetHeight });
 const LAYER_ROWS: [keyof Layers, string, string, string][] = [
@@ -93,7 +99,7 @@ async function boot(): Promise<void> {
   const statusDot = $('status-dot');
   const readoutValue = $('readout-value');
   const readoutSub = $('readout-sub');
-  const consoleState = $('console-state');
+  const statusState = $('status-state');
   const segCount = $('seg-count');
   // the mode switch in the console's title bar
   const modeHead = $('mode-head');
@@ -124,6 +130,7 @@ async function boot(): Promise<void> {
     }
     statusDot.className = `sq ${s.job ? 'blink' : s.status.error ? 'err' : 'ok'}`;
     const empty = !s.image && !s.model;
+    if (!wasEmpty && empty) showSyscheck(); // back on the start screen: with the speed measured meanwhile
     if (wasEmpty && !empty) {
       enter();
       if (sheetLayout() && s.prefs.panelLeft !== false) store.setPrefs({ panelLeft: false }); // the image first; the sheet is a tap away
@@ -133,7 +140,8 @@ async function boot(): Promise<void> {
     document.body.classList.toggle('has-fit', !!s.lastFit && !s.job);
     readoutValue.textContent = s.lastFit ? s.lastFit.psnr.toFixed(2) : '—';
     readoutSub.textContent = s.lastFit ? `${s.lastFit.count.toLocaleString('en-US')} GAUSSIANS // ${s.lastFit.steps.toLocaleString('en-US')} STEPS // ${(s.lastFit.seconds).toFixed(1)} S` : '';
-    consoleState.replaceChildren(h('span', { class: `sq ${s.job ? 'blink' : 'ok'}` }), ` ${s.job ? 'running' : s.model ? 'fitted' : 'idle'}`);
+    // the state of the work leads the status strip (it used to sit in the console's title bar)
+    setText(statusState, s.job ? 'Running' : s.model ? 'Fitted' : 'Idle');
     for (const [m, b] of modeButtons) { b.classList.toggle('on', s.prefs.mode === m); b.setAttribute('aria-checked', String(s.prefs.mode === m)); }
     const frac = s.job ? Math.max(0, s.job.fraction) : 0;
     segCells.forEach((c, i) => c.classList.toggle('on', s.job ? i < Math.round(frac * 12) : false));
@@ -151,12 +159,20 @@ async function boot(): Promise<void> {
     store.setStatus(msg, true);
     $('nogpu').hidden = false;
     $('nogpu-msg').textContent = msg;
+    void noGpuDiagnosis(msg).then((rows) => $('nogpu-diag').replaceChildren(...rows.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])));
   };
+  // the system check on the start screen: what this machine offers and what OTSR can do with it (hardware.ts)
+  const syscheck = $('syscheck');
+  let report: HardwareReport | null = null;
+  let sampleSize: { W: number; H: number } | null = null;
+  const showSyscheck = () => { if (report) renderSyscheck(syscheck, report, store.state.prefs, sampleSize); };
   if (!('gpu' in navigator)) return fail('WebGPU is not available in this browser.');
   let ctx: GpuContext;
   let pipes: Pipelines;
+  let reportReady: Promise<HardwareReport | null>;
   try {
     ctx = await acquireDevice(navigator.gpu, { onError: (m) => { store.setStatus(m, true); toast(m, 'error'); } });
+    reportReady = hardwareReport(ctx.adapter, ctx.device, ctx.info.isFallback).catch(() => null);
     log(`WEBGPU ADAPTER // ${(ctx.info.description || ctx.info.device || ctx.info.vendor || 'GPU').toUpperCase()}`);
     pipes = await createPipelines(ctx.device);
     log(`KERNELS // ${Object.keys(pipes).length} PIPELINES COMPILED`);
@@ -173,9 +189,10 @@ async function boot(): Promise<void> {
   gpuName.title = `${info.vendor} ${info.architecture} ${info.device}${info.isFallback ? ' — software fallback!' : ''}`;
   if (info.isFallback) toast('WebGPU is running on a software fallback adapter; fits will be very slow.', 'error');
 
-  const viewer = new Viewer($('view'), $('overlay'), ctx, pipes, $('stage')); // pointer events on the whole stage
+  // pointer events on the whole stage; on phones at most 2 canvas pixels per CSS pixel
+  const viewer = new Viewer($('view'), $('overlay'), ctx, pipes, $('stage'), { maxDpr: PHONE ? 2 : Infinity });
   const view = $('view');
-  new Stars($<HTMLCanvasElement>('stars'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches, () => store.state.prefs.stars !== false);
+  new Stars($<HTMLCanvasElement>('stars'), () => store.state.prefs.motion !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches, () => store.state.prefs.stars !== false, () => PHONE && !!store.state.job);
   const zoombar = $('toolbar');
   const inspector = $('inspector');
   const monitorEl = $('monitor');
@@ -247,7 +264,7 @@ async function boot(): Promise<void> {
   const placeFrame = () => {
     const s = viewer.sourceSize;
     if (!s) { frame.hidden = true; view.style.clipPath = ''; return; }
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = viewer.dpr;
     const x = viewer.offsetX / dpr, y = viewer.offsetY / dpr, w = (s.W * viewer.zoom) / dpr, hh = (s.H * viewer.zoom) / dpr;
     frame.hidden = false;
     frame.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${hh}px;--h:${hh}px`;
@@ -297,7 +314,9 @@ async function boot(): Promise<void> {
   document.addEventListener('pointerdown', (e) => { if (!viewMenu.hidden && !viewMenu.contains(e.target as Node) && e.target !== tbView && !tbView.contains(e.target as Node)) closeMenu(); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !viewMenu.hidden) { closeMenu(); e.stopImmediatePropagation(); } }, true);
 
-  // the command block at the top centre: the one action when idle, the live readout while a job runs
+  // the command block at the top centre: the one action when idle, the live readout while a job runs. On the phone
+  // layout the action is a split button with the tier in its menu, over a strip of readouts in the style of the
+  // console's Source section: the source, its Gaussians, the GPU memory and the state of the work.
   const cmdIdle = $('cmd-idle');
   const cmdLive = $('cmd-live');
   const cmdFit = $<HTMLButtonElement>('cmd-fit');
@@ -316,8 +335,14 @@ async function boot(): Promise<void> {
   liveProgress.replaceChildren(...liveCells);
   cmdFit.addEventListener('click', () => void actions.fit());
   $('cmd-stop').addEventListener('click', () => jobs.cancel());
+  new TierMenu($<HTMLButtonElement>('cmd-tier'), $('tier-menu'), store);
+  const tierEn = $('cmd-tier-en');
+  const tierZh = $('cmd-tier-zh');
+  const cmdInfo = $('cmd-info');
+  const ciName = $('ci-name'), ciSize = $('ci-size'), ciCount = $('ci-count'), ciMem = $('ci-mem'), ciState = $('ci-state'), ciStateK = $('ci-state-k');
   let fitLabelMode: Mode | null = null;
-  store.subscribe((s) => {
+  store.subscribe((s, changed) => {
+    if (![...changed].some((k) => !COMMAND_IGNORED.has(k))) return;
     const busy = !!s.job;
     cmdIdle.hidden = busy;
     cmdLive.hidden = !busy;
@@ -330,8 +355,27 @@ async function boot(): Promise<void> {
       const { kPerPx, steps } = effectiveSettings(s.prefs);
       const N = gaussianCount(kPerPx, s.image.W, s.image.H);
       const est = fitSecondsEstimate(s.prefs, N, steps);
-      cmdSub.textContent = `×${s.prefs.scale} · ${s.prefs.preset} · ${fmtInt(N)} G · ≈${fmtBytes(fitMemoryBytes(N, s.image.W, s.image.H))}${est !== null ? ` · ~${fmtSeconds(est)}` : ''}${s.model ? ' · refit' : ''}`;
-    } else cmdSub.textContent = '';
+      setText(cmdSub, `×${s.prefs.scale} · ${s.prefs.preset} · ${fmtInt(N)} G · ≈${fmtBytes(fitMemoryBytes(N, s.image.W, s.image.H))}${est !== null ? ` · ~${fmtSeconds(est)}` : ''}${s.model ? ' · refit' : ''}`);
+      setText(tierZh, `${s.prefs.preset === 'custom' ? '自訂' : PRESETS[s.prefs.preset].zh}${est !== null ? ` · ~${fmtSeconds(est)}` : ''}`);
+    } else {
+      setText(cmdSub, '');
+      setText(tierZh, s.prefs.preset === 'custom' ? '自訂' : PRESETS[s.prefs.preset].zh);
+    }
+    setText(tierEn, s.prefs.preset === 'custom' ? 'Custom' : PRESETS[s.prefs.preset].label);
+    // the strip under the split button (phones)
+    const base = s.image ?? s.model;
+    const name = s.image?.name ?? (s.model ? String(s.model.meta.source ?? 'model.otsr') : '');
+    setText(ciName, name || '—');
+    ciName.title = name;
+    setText(ciSize, base ? `${base.W}×${base.H}` : 'Source');
+    const mem = sessionMemory(s, window.innerWidth * window.innerHeight * viewer.dpr ** 2);
+    setText(ciCount, mem ? fmtCount(mem.N) : '—');
+    setText(ciMem, mem ? `${mem.exact ? '' : '≈'}${fmtBytes(mem.bytes)}` : '—');
+    ciMem.title = mem ? `${mem.exact ? 'measured by the last fit' : 'estimated'}: fit ${fmtBytes(mem.fit)} + viewer ${fmtBytes(mem.view)}` : '';
+    const state = s.model && s.lastFit ? (s.lastFit.cancelled ? 'stopped' : 'fitted') : s.model ? 'model' : 'idle';
+    cmdInfo.dataset.state = state;
+    setText(ciStateK, { fitted: 'Fitted', stopped: 'Stopped', model: 'Model', idle: 'State' }[state]);
+    setText(ciState, s.model && s.lastFit ? `${s.lastFit.psnr.toFixed(2)} dB` : s.model ? 'Loaded' : 'Idle');
     if (busy) {
       const job = s.job!;
       const live = s.live;
@@ -501,6 +545,8 @@ async function boot(): Promise<void> {
       box.replaceChildren(h('span', { class: 'micro' }, 'Sample · 樣本'), sel);
       box.hidden = false;
     }
+    sampleSize = { W: list[0].w, H: list[0].h };
+    showSyscheck();
     const btn = $('empty-sample');
     btn.hidden = false;
     btn.title = `${list[0].file} · ${list[0].w} × ${list[0].h}`;
@@ -515,6 +561,12 @@ async function boot(): Promise<void> {
   });
 
   store.setStatus('');
+  report = await reportReady!;
+  if (report) {
+    $('corner-gpu').textContent = `GPU: ${report.gpu}`;
+    showSyscheck();
+    log(`SYSTEM CHECK // ${{ ok: 'READY', warn: 'LIMITED', bad: 'SLOW' }[syscheck.dataset.level ?? 'ok'] ?? 'READY'} · ${report.gpu.toUpperCase()}`);
+  }
   log('READY // DROP, PASTE OR OPEN AN IMAGE');
   (window as unknown as { otsr: unknown }).otsr = api(store, actions, viewer, ctx, pipes, show);
 }
@@ -524,7 +576,7 @@ function api(store: Store, actions: Actions, viewer: Viewer, ctx: GpuContext, pi
   return {
     state: () => {
       const s = store.state;
-      return { image: s.image && { name: s.image.name, W: s.image.W, H: s.image.H }, model: s.model && { N: s.model.N, W: s.model.W, H: s.model.H }, fitting: !!s.job, lastFit: s.lastFit, live: s.live, adapter: s.adapter, zoom: s.zoom, mode: s.prefs.mode, roi: s.roi, layers: s.layers, errorStats: s.errorStats, regions: s.regions, monitor: s.monitor, phase: show.phaseName };
+      return { image: s.image && { name: s.image.name, W: s.image.W, H: s.image.H }, model: s.model && { N: s.model.N, W: s.model.W, H: s.model.H }, fitting: !!s.job, lastFit: s.lastFit, live: s.live, adapter: s.adapter, zoom: s.zoom, mode: s.prefs.mode, preset: s.prefs.preset, phone: PHONE, roi: s.roi, layers: s.layers, errorStats: s.errorStats, regions: s.regions, monitor: s.monitor, phase: show.phaseName };
     },
     loadRgba: (rgba8: Uint8ClampedArray | number[], W: number, H: number, name?: string) => actions.loadRgba(rgba8, W, H, name),
     loadImage: (file: Blob, name: string) => actions.openImage(file, name),

@@ -39,17 +39,18 @@ Linux, Android) or Safari 26+ (macOS, iOS), on a machine with a GPU. Integrated 
 is much faster. Then:
 
 1. Press **Load sample**, or **Open image** / drop / paste an image of your own.
-2. Pick a preset (Fast / Standard / Best) and press **Enhance**. While it runs the stage plays the real process: the
-   optimal-transport mesh settling on the image through every Sinkhorn stage, the Gaussians growing in their id
-   colours, a scan line revealing the result; the monitor on the right follows the three regions with the strongest
-   gradients.
+2. Pick a tier (Turbo / Fast / Standard / Best) and press **Enhance**. While it runs the stage plays the real
+   process: the optimal-transport mesh settling on the image through every Sinkhorn stage, the Gaussians growing in
+   their id colours, a scan line revealing the result; the monitor on the right follows the three regions with the
+   strongest gradients. Turbo skips the show and is done in a fraction of a second on a desktop GPU.
 3. Drag the divider to compare against bicubic, zoom with the wheel, pan by dragging; the **View** menu switches the
    vector view, the OT mesh, the 1σ outlines and the error map.
 4. **Export** as PNG, JPEG, WebP, AVIF or BMP at 1×–16× or any scale, or **Save .otsr** to keep the model (a few MB,
    re-renderable at any size later with **Load .otsr**).
 
-On a phone the console is a sheet at the bottom (tap its title bar to open or fold it), two fingers zoom, and the
-rest is the same. The **[technical report](https://aztech-lab.github.io/OTSR/report.html)** tells the method of the paper behind
+The start screen first checks the device: whether WebGPU works here, the GPU and its limits, and the largest image
+one fit can take. On a phone the tier sits in the menu of the Enhance button (phones start on Fast), the console is a
+sheet at the bottom (tap its title bar to open or fold it), two fingers zoom, and the rest is the same. The **[technical report](https://aztech-lab.github.io/OTSR/report.html)** tells the method of the paper behind
 the app the way a magazine would, with nine live demonstrations, what the app does, how the engine works, and a
 reading list.
 
@@ -127,7 +128,7 @@ docs/                     documentation (method, engine, file format, testing, p
 
 | Version | What it brought |
 |---|---|
-| **0.1.4** | The **technical report**, rewritten as a magazine would tell it: the method of the paper in plain words, the pipeline run live under Figure A, nine live demonstrations, the results in prose, a reading list of 45 entries; one name, *mesh*, for the transported grid everywhere. |
+| **0.1.4** | **Phones, part two**: a **Turbo** tier (about 4× quicker than Fast, no fit animation) and Fast by default on phones; the tier in the split menu of the Enhance button, with the source, its cost and the state in a strip under it; a **system check** on the start screen (WebGPU, the GPU and its limits, the largest image one fit can take); the state in the status strip and a clearer mode switch; a fit animation that no longer slows the fit. The **technical report** rewritten as a magazine would tell it: the pipeline run live under Figure A, nine live demonstrations, a reading list of 45 entries; *mesh* instead of *lattice* throughout. |
 | **0.1.3** | **Phones**: a bottom-sheet layout with pinch zoom, a column layout sideways; the **technical report** page; the mode switch in the console's title bar and a console that keeps its width; less work per frame. |
 | **0.1.2** | The extras and the **vector view**: the model in Gaussian-id colours, the fit animation (OT mesh → Gaussians → scan reveal), the monitor panel, the View menu (vector / OT mesh / outlines / error map), export as PNG / JPEG / WebP / AVIF / BMP, a process log, notices in the status strip, bilingual labels, starlight and geometry on the stage, the way back to the start screen. |
 | **0.1.1** | **Research mode**: custom budget and steps, edge width, L1 / L2 loss, view modes and split against any resampler, 1σ outlines, error map, region tool, session info with the PSNR curve. |
