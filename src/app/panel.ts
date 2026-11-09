@@ -175,7 +175,8 @@ export class Panel {
       this.switchRow('Crisp edges', '銳利邊緣', 'distance-field edge pass at magnification', (st) => st.prefs.edges, (v) => { s.setPrefs({ edges: v }); this.viewer.edges = v; this.viewer.requestRender(); }),
       research ? this.rangeField('Edge width', '邊緣寬度', 'edgePx', 0.4, 3, 0.1, 'px', (v) => { s.setPrefs({ edgePx: v }); this.viewer.edgePx = v; this.viewer.requestRender(); }) : null,
       exportWrap,
-      h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, bi('Load model', '載入模型'), h('span', { class: 'arrow' }, '↗')), loadInput));
+      // phones: export only; the model file and the process log are desktop tools
+      compact ? null : h('div', { class: 'links' }, saveBtn, h('button', { class: 'textbtn', onClick: () => loadInput.click() }, bi('Load model', '載入模型'), h('span', { class: 'arrow' }, '↗')), loadInput));
     let labelled: ExportFormat | null = null;
     this.refreshers.push((st) => {
       const base = st.model ?? st.image;
@@ -286,7 +287,7 @@ export class Panel {
       } else done.hidden = true;
     });
 
-    this.root.replaceChildren(...sections, run);
+    this.root.replaceChildren(...sections, ...(compact ? [] : [run]));
     for (const r of this.refreshers) r(s.state);
   }
 

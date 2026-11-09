@@ -35,6 +35,9 @@ In the app:
 - **Less work on phones**: the viewer draws at most 2 canvas pixels per CSS pixel (a 3× screen rendered 2.25 times
   the pixels for little visible gain, and the canvas-sized buffers shrink with it), the starlight holds still while a
   job runs, and a folded or closed console is not kept up to date until it opens.
+- **A lighter phone console**: Output and Export only (the model file buttons and the process log stay on computers),
+  so the image takes most of the screen; the sheet rises in when it opens, also by itself after a fit. The start
+  screen keeps all its motion on phones, and the settings no longer scroll sideways on narrow screens.
 - **The fit animation no longer slows the fit.** Its mesh was stroked two canvas pixels wide on high-density screens,
   a slow path of the 2-D canvas, and redrawn at the display rate: in headless Chrome the fit ran at about a third of
   its speed while the mesh was on screen. The mesh is now drawn with hairlines and one fill per brightness level

@@ -210,7 +210,9 @@ try {
     check(!(await folded()), portrait ? 'sheet open after the fit' : 'column open after the fit');
     await shot('5_fitted');
     await problems('fitted');
-    check(await page.evaluate(() => /\d+\.\d\d dB/.test(document.querySelector('#panel .done')?.textContent ?? '')), 'PSNR shown in the console');
+    check(await page.evaluate(() => /\d+\.\d\d dB/.test(document.getElementById('ci-state')?.textContent ?? '')), 'PSNR shown in the strip under Enhance');
+    check(await page.evaluate(() => !document.querySelector('#panel .run') && !/Save model|Load model/.test(document.getElementById('panel').textContent)), 'no process log or model file buttons in the phone console');
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
     // menus and dialogs
     await page.evaluate(() => document.querySelector('.splitbtn .menu').click());
     await sleep(250);
@@ -225,6 +227,7 @@ try {
     await shot('8_settings');
     await problems('settings dialog');
     check(await page.evaluate(() => { const d = document.getElementById('settings'); return d.scrollHeight <= d.clientHeight + 1 || getComputedStyle(d).overflowY === 'auto'; }), 'settings dialog scrolls when taller than the screen');
+    check(await page.evaluate(() => { const d = document.getElementById('settings'); return d.scrollWidth <= d.clientWidth && getComputedStyle(d).overflowX === 'hidden'; }), 'settings dialog: no sideways scroll');
     await page.evaluate(() => { document.getElementById('settings').close(); window.otsr.setMode('research'); });
     await sleep(400);
     await shot('9_research');

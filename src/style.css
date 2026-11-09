@@ -445,7 +445,7 @@ dialog.modal td .key { margin-right: 4px; }
 .modal-foot .btn { height: 40px; }
 .modal-foot .links { margin: 0; gap: 6px 16px; }
 
-@media (prefers-reduced-motion: reduce), (max-width: 960px) { .ring-spin, .ring-spin-r, .sq.blink, .frame .scan, .progress.indet i, .bg i, .bg .geo g { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .ring-spin, .ring-spin-r, .sq.blink, .frame .scan, .progress.indet i, .bg i, .bg .geo g { animation: none !important; } }
 body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink, body.no-motion .frame .scan, body.no-motion .progress.indet i, body.no-motion .bg i, body.no-motion .bg .geo g { animation: none !important; }
 /* no keyboard: the shortcuts button and the key badges mean nothing on a touch screen */
 @media (pointer: coarse) { #help-btn, .textbtn .key, .navbtn .key, .file .key, .links .key { display: none; } }
@@ -494,6 +494,9 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .console::before, .console::after { display: none; }
   body.left-closed .console { display: flex; }
   body.left-closed .console .console-body { display: none; }
+  /* the sheet body rises in whenever it opens (a tap, or by itself after a fit) */
+  body:not(.left-closed) .console .console-body { animation: sheetIn 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes sheetIn { from { transform: translateY(28px); opacity: 0; } }
   body.left-closed .sheet-toggle i { transform: rotate(180deg); }
   .console-head { height: 42px; padding: 0 6px 0 14px; gap: 8px; }
   .console-head .hatch { display: none; }
@@ -549,7 +552,9 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .statusbar .notice { max-width: calc(100vw - 24px); top: auto; bottom: 0; }
   .vignette { background: linear-gradient(180deg, var(--bg) 0, transparent 140px), linear-gradient(0deg, var(--bg) 0, transparent calc(var(--sheet-h) + 110px)); }
   body.left-closed .vignette { background: linear-gradient(180deg, var(--bg) 0, transparent 140px), linear-gradient(0deg, var(--bg) 0, transparent calc(var(--sheet-h) + 110px)); }
-  dialog.modal { width: calc(100vw - 20px); max-height: calc(100vh - 36px); }
+  dialog.modal { width: calc(100vw - 20px); max-width: calc(100vw - 20px); max-height: calc(100vh - 36px); overflow-x: hidden; touch-action: pan-y; }
+  .setting > * { min-width: 0; max-width: 100%; }
+  .seg { max-width: 100%; flex-wrap: wrap; }
   dialog.modal .body { padding: 16px 18px 20px; }
   dialog.modal h2 { font-size: 20px; }
   dialog.modal h2 small { display: block; margin: 6px 0 0; }

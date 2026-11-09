@@ -214,7 +214,7 @@ async function boot(): Promise<void> {
       } else {
         const sheetH = loaded ? box(inspector).height : 0;
         document.documentElement.style.setProperty('--sheet-h', `${sheetH}px`);
-        viewer.setInsets({ left: 10, top, right: 10, bottom: sheetH + 58 });
+        viewer.setInsets({ left: 4, top: top - 4, right: 4, bottom: sheetH + 52 });
       }
       zoombar.style.left = '';
       return;
