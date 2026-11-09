@@ -50,7 +50,7 @@ in the browser.
    wordmark (or pressing Home) returns to the start screen — the entering transition played backwards — and drops
    the image and the model.
 
-While the fit runs the view plays the process itself (*Fit animation* in the settings): the uniform lattice, then the
+While the fit runs the view plays the process itself (*Fit animation* in the settings): the uniform mesh, then the
 real stages of the optimal-transport initialisation (the barycentric map after every ε-scaling stage of the Sinkhorn
 loop) as a glowing mesh that settles on the image structure; then the Gaussians themselves, rendered live by the
 engine from the parameters the optimiser is changing, growing from points, each with an independent random colour
@@ -66,7 +66,7 @@ OTSR on the right. Drag the divider, zoom in (wheel, `+`/`−`, the toolbar) and
 the image to the view and `1` for actual pixels. Hold `B` to see bicubic everywhere, `N` for nearest neighbour and `R`
 for the raw Gaussians without the edge pass. The toolbar's *Compare* button (or `C`) toggles the divider; its *View* menu
 switches the layers: the **vector view** (`V`, every Gaussian in a random colour times its luma — the Gaussian-id
-figure of the paper), the **OT lattice** of the initialisation over the image (`T`), the **1σ outlines** (`G`) and
+figure of the paper), the **OT mesh** of the initialisation over the image (`T`), the **1σ outlines** (`G`) and
 the **error map** (`D`). Pixel rulers
 run along the top and left edge of the image and the status strip shows the source pixel under the cursor. The canvas
 is clipped to the image, so the slowly moving stage shows around it when zoomed out. The *GPU mem* readout is an
@@ -82,7 +82,7 @@ fit animation and all decorative motion off.
   squared error, the paper setting) or *L1* (Charbonnier, ε = 10⁻³; PSNR is always reported against the source).
 - *View*: OTSR, Gaussians only (no edge pass), and the classic resamplers of the source — bicubic, bilinear, nearest —
   plus the split comparison against any of them, and the four layers of the toolbar's *View* menu: **Vector view** (`V`),
-  **OT lattice** (`T`), **Gaussians 1σ** (`G`) draws the 1-sigma outline
+  **OT mesh** (`T`), **Gaussians 1σ** (`G`) draws the 1-sigma outline
   of every Gaussian in view in its own colour from 2× zoom on; **Error map** (`D`) renders the model at 1× and shows
   |model − source| per pixel on an inferno scale whose gain follows the 99.5th percentile (the mean and maximum error
   and the white point are listed under the switches).

@@ -184,7 +184,7 @@ export class Panel {
         this.switchRow('Split compare', '分割對比', 'divider between the source and the result (C)', (st) => st.prefs.compare === 'split', (v) => { s.setPrefs({ compare: v ? 'split' : 'off' }); this.viewer.compare = v; this.viewer.requestRender(); }),
         h('label', { class: 'field' }, h('span', null, 'Compare with', h('i', { class: 'zh' }, '對比對象')), cmpWith),
         this.switchRow('Vector view', '矢量視角', 'every Gaussian in a random colour × its luma (V)', (st) => st.layers.vector, (v) => a.setLayer('vector', v)),
-        this.switchRow('OT lattice', '傳輸網格', 'the transport lattice of the initialisation (T)', (st) => st.layers.ot, (v) => a.setLayer('ot', v)),
+        this.switchRow('OT mesh', '傳輸網格', 'the transport mesh of the initialisation (T)', (st) => st.layers.ot, (v) => a.setLayer('ot', v)),
         this.switchRow('Gaussians 1σ', '高斯輪廓', 'outline of every Gaussian in its own colour, from 2× zoom (G)', (st) => st.layers.gaussians, (v) => a.setLayer('gaussians', v)),
         this.switchRow('Error map', '誤差圖', '|model − source| per pixel, inferno scale, auto gain (D)', (st) => st.layers.error, (v) => a.setLayer('error', v)),
         layerNote));

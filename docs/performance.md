@@ -8,7 +8,7 @@ RTX 4090, Windows 11, driver 32.0.16.1692, Dawn (D3D12) in Node 24 — `node too
 
 | stage | result |
 |---|---|
-| OT initialisation | 419 256 Gaussians (647 × 648 lattice), 256 × 256 transport grid, 156 Sinkhorn iterations: **0.52 s** (density 0.36 s on the CPU, transport 0.04 s, parameters 0.11 s) |
+| OT initialisation | 419 256 Gaussians (647 × 648 mesh), 256 × 256 transport grid, 156 Sinkhorn iterations: **0.52 s** (density 0.36 s on the CPU, transport 0.04 s, parameters 0.11 s) |
 | fit, 3000 steps | **5.3 s = 565 steps/s**, 52.75 dB (51.8 dB after 500 steps, 52.5 after 1500); 1.51 M tile entries = 3.6 per Gaussian |
 | export 4× with edges | 8192 × 8192 in **1.27 s** (2048-px tiles), before PNG encoding |
 | native render + full read-back | 83 ms per frame (dominated by reading 64 MB back to the CPU; the viewer does not read back) |

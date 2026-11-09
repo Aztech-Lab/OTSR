@@ -2,28 +2,43 @@
 
 ## 0.1.4 — 2026-11-09
 
-The technical report, rewritten as a magazine would tell it.
+The technical report, rewritten as a magazine would tell it; the transport lattice is now called the mesh.
 
-- **The method in plain words.** `report.html` now tells the whole story of the workshop paper behind the app —
-  the problem, the picture made of Gaussians, where they should go, the transport, the solver, the re-layout, the
-  renderer, the fit, super-resolution, what the paper measured, editing through the lattice, the limits — in a
-  magazine register, with the paper's results quoted in prose. No figures or tables are copied from the paper.
-  Copper *In the app* tags mark what the app does now; *Paper* tags what the experiments show but the app does not do
-  yet (the error-driven re-layout, the degradation-consistent refinement, the fold penalty).
-- **Nine live demonstrations**, computed in the page on the CPU: the lattice unfolding along a convex-potential map
-  with the Gaussians inherited from the cells (A); equal shares in one dimension, quantiles against samples (B); the
-  same in two dimensions with a real entropic transport solve and nearest-centre cells coloured by their share (H);
-  additive against weight-normalised blending (C); the edge pass across an edge at any S (D), and applied to a
-  rendered glyph next to its pixels at any scale (E); real Sinkhorn iterations with ε-scaling, the plan sharpening
-  into the map (F); the error-driven re-layout (G); editing through the lattice by dragging vertices, folded cells
-  shown in red (I). Each has Play / Pause and sliders, runs only while on screen and follows the app's motion setting.
+- **The method in plain words.** `report.html` tells the whole story of the workshop paper behind the app — the
+  problem, the picture made of Gaussians, where they should go, the transport, the solver, the re-layout, the
+  renderer, the fit, super-resolution, what the paper measured, editing through the mesh, the limits — in a magazine
+  register, with the paper's results quoted in prose. No figures or tables are copied from the paper. Copper
+  *In the app* tags mark what the app does now; *Paper* tags what the experiments show but the app does not do yet
+  (the error-driven re-layout, the degradation-consistent refinement, the fold penalty).
+- **Figure A runs the pipeline live.** Under each box of the pipeline diagram, its stage computed in the page on a
+  112-pixel copy of the sample picture: the picture, its importance density on the transport grid, a real entropic
+  transport and the mesh unfolding along it, the Gaussians of the mesh in the vector view, a real fit (the blend,
+  exact gradients and Adam with the paper's schedule, 400 steps, about 30 dB) and a crop at 12× with the edge pass
+  against its pixels. The first time the figure comes into view the strip shows the computation as it happens; then
+  it replays the stages, the active box of the diagram lit. The numerical core is `src/report-fit.ts` (no DOM); its
+  gradients are checked against finite differences in `tests/unit/report-fit.test.ts`.
+- **Nine live demonstrations**, lettered in reading order: a handful of Gaussians at any scale next to their pixels,
+  with the edge pass on (A); equal shares in one dimension (B) and in two, with a real transport solve (C); the mesh
+  unfolding along a convex-potential map with the Gaussians of its cells (D); Sinkhorn iterations with ε-scaling (E);
+  the error-driven re-layout (F); additive against weight-normalised blending (G); the edge pass across an edge, its
+  legend now above the curves (H); editing through the mesh by dragging vertices, folded cells in red (I). Each has
+  Play / Pause and sliders, runs only while on screen and follows the app's motion setting; the heavy ones compute
+  when they first come into view.
+- **Mesh, not lattice**, everywhere a reader sees it: the report, the View menu and the research panel (*OT mesh*),
+  the shortcut list, the process log, the README and the docs.
 - **A reading list** of 45 entries: the paper's 28 references and 17 more — Monge, Kantorovich, Brenier, Villani,
   Sinkhorn–Knopp, Lloyd, EWA splatting, Keys, Lanczos, the WebGPU specifications — each with a line on why it is here.
 - The contents list scrolls on short windows; the report entry on the start screen sits under the pair.
 
-Verified: build and type check; the report's HTML balanced, no duplicate ids, every local link and citation target
-present; desktop and phone review shots of every demo and section — all nine demos mounted, no element outside the
-viewport on either; the unit, GPU, browser and phone suites as before.
+Found on the way: the barycentric transport map is pulled half a cell inward at the border of the box by the entropic
+blur, which left the outer band of a small picture without Gaussians; in the report's core the normal displacement now
+fades to zero at the edge of the box, as a transport of the box onto itself keeps its boundary (the app's engine is
+unchanged).
+
+Verified: build and type check; unit 9/9 (three new: exact gradients against central differences, max deviation
+1.1 × 10⁻¹⁰ against a gradient of 5.5 × 10⁻²; a fit from the transported mesh, 21.9 → 52.8 dB in 200 steps; the
+transport of a uniform and of a left-heavy density); GPU golden 8/8; the browser and phone suites; desktop and phone
+review shots of the report, the live strip run to the end, every demo mounted, no element outside the viewport.
 
 Each entry records what the version brought, how it was verified before release, and what was found and fixed on
 the way. Numbers are from the machines named; the engine (`src/engine`) is unchanged since 0.1.0 except where said.

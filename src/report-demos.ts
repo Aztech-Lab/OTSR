@@ -1,9 +1,11 @@
-// The small live demonstrations of the technical report, each a <figure class="fig demo" data-demo="…"> whose
-// .demo-stage receives an SVG or a canvas and whose .demo-ctl receives its controls. Everything is computed in
-// plain JavaScript on the page: the transport map of the unfold demo is the gradient of a convex potential, the
-// one-dimensional transport is the quantile function, the Sinkhorn demo runs real iterations on a 48-bin problem,
-// the resolution demo evaluates a handful of Gaussians per output pixel. A demo animates only while it is on screen
-// and the motion setting is on; its sliders work in any case.
+// The live demonstrations of the technical report, each a <figure class="fig demo" data-demo="…"> whose .demo-stage
+// receives an SVG or a canvas and whose .demo-ctl receives its controls. Everything is computed on the page: the map of
+// the unfold demo is the gradient of a convex potential, the one-dimensional transport is the quantile function, the
+// Sinkhorn demo runs real iterations on a 48-bin problem, the two-dimensional shares demo and the strip under Figure A
+// run a real entropic transport, and the strip a real fit (report-fit.ts). A demo animates only while it is on screen
+// and the motion setting is on; its sliders work in any case. The letters of the demos are given by the page.
+
+import { Fitter, densityGrid, edgePass, mapAt, meshGaussians, psnr, renderGaussians, sinkhornMap, tick, vectorColours, type Grid, type Mesh } from './report-fit';
 
 type Motion = () => boolean;
 
@@ -87,8 +89,25 @@ class Loop {
 
 const ease = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : 0.5 - 0.5 * Math.cos(Math.PI * u));
 
+/** Calls `fn` once, when the element first comes near the screen (heavy work waits until it is wanted). */
+function onFirstVisible(target: Element, fn: () => void): void {
+  const io = new IntersectionObserver((entries) => {
+    if (!entries.some((e) => e.isIntersecting)) return;
+    io.disconnect();
+    fn();
+  }, { rootMargin: '160px' });
+  io.observe(target);
+}
+
+/** A canvas holding RGBA bytes. */
+function toCanvas(rgba: Uint8ClampedArray<ArrayBuffer>, w: number, h: number): HTMLCanvasElement {
+  const c = el('canvas', { width: String(w), height: String(h) });
+  c.getContext('2d')!.putImageData(new ImageData(rgba, w, h), 0, 0);
+  return c;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
-// A. The lattice unfolding along the transport map T = ∇ψ, ψ convex, so no cell ever folds; Gaussians from J JT.
+// unfold — the mesh unfolding along the transport map T = ∇ψ, ψ convex, so no cell ever folds; Gaussians from J Jᵀ.
 // ---------------------------------------------------------------------------------------------------------------
 function demoUnfold(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
   const W = 640, H = 424, COLS = 17, ROWS = 11, X0 = 40, Y0 = 36, PW = 560, PH = 330;
@@ -105,7 +124,7 @@ function demoUnfold(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void 
     const [ax, ay] = T(x + e, y), [bx, by] = T(x - e, y), [cx, cy] = T(x, y + e), [dx, dy] = T(x, y - e);
     return ellipseOf((ax - bx) / (2 * e), (cx - dx) / (2 * e), (ay - by) / (2 * e), (cy - dy) / (2 * e), h);
   });
-  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'A lattice unfolding onto a ridge and a blob along a transport map' });
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'A mesh unfolding onto a ridge and a blob along a transport map' });
   const ridgePath = svgEl('path', { d: Array.from({ length: 41 }, (_, k) => `${k ? 'L' : 'M'}${(X0 + (k * PW) / 40).toFixed(1)} ${ridge(X0 + (k * PW) / 40).toFixed(1)}`).join(' '), class: 'cu2', 'stroke-width': 2, 'stroke-dasharray': '6 5', opacity: 0.8, fill: 'none' });
   const blob = svgEl('circle', { cx: BX, cy: BY, r: SB, class: 'cu2', 'stroke-dasharray': '4 5', opacity: 0.6, fill: 'none' });
   svg.append(ridgePath, blob);
@@ -144,7 +163,7 @@ function demoUnfold(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void 
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// B. Equal shares in one dimension: quantiles against samples of the same density.
+// shares — equal shares in one dimension: quantiles against samples of the same density.
 // ---------------------------------------------------------------------------------------------------------------
 function demoShares(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
   const W = 640, H = 322, X0 = 40, X1 = 600;
@@ -200,11 +219,11 @@ function demoShares(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void 
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// C. Additive against weight-normalised blending of two overlapping Gaussians.
+// blend — additive against weight-normalised blending of two overlapping Gaussians.
 // ---------------------------------------------------------------------------------------------------------------
 function demoBlend(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
-  const W = 640, H = 270, X0 = 40, X1 = 600;
-  const canvas = el('canvas', { width: '1280', height: '540', 'aria-label': 'Two overlapping Gaussians blended additively and with weight normalisation' });
+  const W = 640, H = 292, X0 = 40, X1 = 600;
+  const canvas = el('canvas', { width: '1280', height: '584', 'aria-label': 'Two overlapping Gaussians blended additively and with weight normalisation' });
   canvas.style.width = '100%';
   canvas.style.aspectRatio = `${W} / ${H}`;
   stage.append(canvas);
@@ -239,7 +258,9 @@ function demoBlend(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
     const curve = (f: (x: number) => number, color: string, width: number) => { g.strokeStyle = color; g.lineWidth = width; g.beginPath(); for (let i = 0; i <= 280; i++) { const x = i / 280; const v = Math.min(2, f(x)); const px = X0 + x * (X1 - X0), py = y0 - v * yh; if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.stroke(); };
     const a1 = (x: number) => Math.exp(-((x - 0.5 + gap / 2) ** 2) / (2 * sigma * sigma)), a2 = (x: number) => Math.exp(-((x - 0.5 - gap / 2) ** 2) / (2 * sigma * sigma));
     curve((x) => a1(x) + a2(x), ink, 1.3); curve(a1, `rgb(${c1.join(',')})`, 2.2); curve(a2, `rgb(${c2.join(',')})`, 2.2);
-    g.fillStyle = muted; g.fillText('α₁, α₂ and their sum: above 1 the additive sum saturates; the normalised blend is a convex combination everywhere', X0, 266);
+    g.fillStyle = muted;
+    g.fillText('α₁, α₂ in their colours, their sum in ink: above 1 the additive sum saturates,', X0, 270);
+    g.fillText('while the normalised blend stays a convex combination of the colours everywhere', X0, 284);
   };
   let clock = 0;
   const loop = new Loop(stage, motion, (_now, dt) => { clock += dt; gap = 0.34 + 0.22 * Math.sin(clock * 0.9); gapS.value = gap.toFixed(2); draw(); });
@@ -250,18 +271,24 @@ function demoBlend(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// D. The edge pass: a soft ramp at S× re-thresholded to a transition of edge_px output pixels.
+// edge — the edge pass: a soft ramp at S× re-thresholded to a transition of edge_px output pixels.
 // ---------------------------------------------------------------------------------------------------------------
 function demoEdge(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
-  const W = 640, H = 250, X0 = 56, X1 = 620, Y0 = 196, Y1 = 36;
+  const W = 640, H = 300, X0 = 56, X1 = 620, Y0 = 244, Y1 = 84;
   const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'The soft ramp of the Gaussian render across an edge and the transition after the edge pass' });
   const px = (u: number) => X0 + ((u + 12) / 24) * (X1 - X0), py = (v: number) => Y0 - v * (Y0 - Y1);
   svg.append(svgEl('line', { x1: X0, y1: Y0, x2: X1, y2: Y0, class: 'faint' }), svgEl('line', { x1: X0, y1: Y0, x2: X0, y2: Y1, class: 'faint' }), svgEl('line', { x1: X0, y1: py(0.5), x2: X1, y2: py(0.5), class: 'faint', 'stroke-dasharray': '3 5' }));
   for (const u of [-8, -4, 0, 4, 8]) { const tx = svgEl('text', { x: px(u), y: Y0 + 18, 'text-anchor': 'middle', class: 'mu' }); tx.textContent = `${u > 0 ? '+' : ''}${u} px`; svg.append(tx); }
+  for (const [v, l] of [[0, '0'], [1, '1']] as const) { const tx = svgEl('text', { x: X0 - 8, y: py(v) + 4, 'text-anchor': 'end', class: 'mu' }); tx.textContent = l; svg.append(tx); }
+  const mid = svgEl('text', { x: X1, y: py(0.5) - 6, 'text-anchor': 'end', class: 'mu' });
+  mid.textContent = 't = ½ · the edge';
+  // the legend above the plot: what the two curves are, with the numbers of the current S and edge_px
+  svg.append(svgEl('line', { x1: X0, y1: 22, x2: X0 + 26, y2: 22, class: 'faint', 'stroke-width': 2 }), svgEl('line', { x1: X0, y1: 46, x2: X0 + 26, y2: 46, class: 'cu', 'stroke-width': 2.2 }));
+  const legendSoft = svgEl('text', { x: X0 + 36, y: 26, class: 'mu' }), legendSharp = svgEl('text', { x: X0 + 36, y: 50, class: 'mu cut' });
   const soft = svgEl('polyline', { class: 'faint', 'stroke-width': 2, fill: 'none' }), sharp = svgEl('polyline', { class: 'cu', 'stroke-width': 2.2, fill: 'none' });
   const bracket = svgEl('path', { class: 'cu', 'stroke-width': 1, fill: 'none' });
-  const text = svgEl('text', { x: X1, y: Y1 + 4, 'text-anchor': 'end', class: 'mu cut' });
-  svg.append(soft, sharp, bracket, text);
+  const bracketLabel = svgEl('text', { x: px(0), 'text-anchor': 'middle', class: 'mu cut' });
+  svg.append(mid, legendSoft, legendSharp, soft, sharp, bracket, bracketLabel);
   stage.append(svg);
   let S = 8, edgePx = 1.4;
   const draw = () => {
@@ -269,12 +296,15 @@ function demoEdge(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
     soft.setAttribute('points', Array.from({ length: 241 }, (_, i) => { const u = -12 + i / 10; return `${px(u).toFixed(1)},${py(1 / (1 + Math.exp(-u / scale))).toFixed(1)}`; }).join(' '));
     const sm = (t: number) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
     sharp.setAttribute('points', Array.from({ length: 481 }, (_, i) => { const u = -12 + i / 20; return `${px(u).toFixed(1)},${py(sm((u + edgePx / 2) / edgePx)).toFixed(1)}`; }).join(' '));
-    const yb = py(0.5) + 26;
+    const yb = py(0.5) + 24;
     bracket.setAttribute('d', `M${px(-edgePx / 2).toFixed(1)} ${yb - 5} v5 H${px(edgePx / 2).toFixed(1)} v-5`);
-    text.textContent = `S = ${S}×: the 0.3-px Gaussian becomes a ${(0.3 * S).toFixed(1)}-px ramp; after the pass ${edgePx.toFixed(1)} px`;
+    bracketLabel.setAttribute('y', String(yb + 16));
+    bracketLabel.textContent = `${edgePx.toFixed(1)} px`;
+    legendSoft.textContent = `the Gaussian render at ${S}×: a 0.3-px Gaussian is a ${(0.3 * S).toFixed(1)}-px ramp`;
+    legendSharp.textContent = `after the edge pass: ${edgePx.toFixed(1)} output pixels, at any S`;
   };
   let clock = 0;
-  const loop = new Loop(stage, motion, (_now, dt) => { clock += dt; S = Math.round(2 + 7 * (1 - Math.cos(clock * 0.7)) ); sS.value = String(S); draw(); });
+  const loop = new Loop(stage, motion, (_now, dt) => { clock += dt; S = Math.round(2 + 7 * (1 - Math.cos(clock * 0.7))); sS.value = String(S); draw(); });
   loop.playButton(ctl);
   const sS = slider(ctl, 'S', 2, 16, 1, S, (v) => `${v}×`, (v) => { S = v; loop.pause(); draw(); });
   slider(ctl, 'edge_px', 0.4, 3, 0.1, edgePx, (v) => `${v.toFixed(1)} px`, (v) => { edgePx = v; draw(); });
@@ -282,7 +312,7 @@ function demoEdge(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// E. A handful of Gaussians rendered at any scale, next to the pixels they were fitted to.
+// anyres — a handful of Gaussians rendered at any scale, next to their pixels, with the edge pass of the app.
 // ---------------------------------------------------------------------------------------------------------------
 function demoAnyRes(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
   const BW = 40, BH = 26;
@@ -317,32 +347,7 @@ function demoAnyRes(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void 
     return out;
   };
   const base = render(1);
-  // the distance-field edge pass of the app, on the CPU: window min / max by luma, a locally normalised field, a
-  // smoothstep of edge_px output pixels, blended in where there is contrast
-  const edgePass = (src: ImageData, S: number, edgePx = 1.4): ImageData => {
-    const w = src.width, hh = src.height, d = src.data, n = w * hh;
-    const Y = new Float32Array(n);
-    for (let i = 0; i < n; i++) Y[i] = (0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2]) / 255;
-    const r = Math.max(1, Math.round(0.75 * S));
-    const hmin = new Int32Array(n), hmax = new Int32Array(n), vmin = new Int32Array(n), vmax = new Int32Array(n);
-    for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) { let mi = y * w + x, ma = mi; for (let k = -r; k <= r; k++) { const xx = x + k; if (xx < 0 || xx >= w) continue; const q = y * w + xx; if (Y[q] < Y[mi]) mi = q; if (Y[q] > Y[ma]) ma = q; } hmin[y * w + x] = mi; hmax[y * w + x] = ma; }
-    for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) { let mi = hmin[y * w + x], ma = hmax[y * w + x]; for (let k = -r; k <= r; k++) { const yy = y + k; if (yy < 0 || yy >= hh) continue; const a = hmin[yy * w + x], b = hmax[yy * w + x]; if (Y[a] < Y[mi]) mi = a; if (Y[b] > Y[ma]) ma = b; } vmin[y * w + x] = mi; vmax[y * w + x] = ma; }
-    const t = new Float32Array(n), range = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const lo = Y[vmin[i]], hi = Y[vmax[i]]; range[i] = hi - lo; t[i] = range[i] > 1e-6 ? (Y[i] - lo) / range[i] : 0.5; }
-    const sm = (a: number, b: number, x: number) => { const u = Math.max(0, Math.min(1, (x - a) / Math.max(1e-6, b - a))); return u * u * (3 - 2 * u); };
-    const out = new ImageData(w, hh), o = out.data;
-    for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      const gx = (t[y * w + Math.min(w - 1, x + 1)] - t[y * w + Math.max(0, x - 1)]) / 2, gy = (t[Math.min(hh - 1, y + 1) * w + x] - t[Math.max(0, y - 1) * w + x]) / 2;
-      const wd = 0.5 * edgePx * Math.hypot(gx, gy);
-      const alpha = sm(0.5 - wd, 0.5 + wd, t[i]), gate = sm(0.08, 0.2, range[i]);
-      const D = vmin[i], B = vmax[i];
-      for (let c = 0; c < 3; c++) { const sharp = d[4 * D + c] + (d[4 * B + c] - d[4 * D + c]) * alpha; o[4 * i + c] = d[4 * i + c] + gate * (sharp - d[4 * i + c]); }
-      o[4 * i + 3] = 255;
-    }
-    return out;
-  };
-  let edge = false;
+  let edge = true;
   const left = el('canvas', { 'aria-label': 'The pixels, magnified' }), right = el('canvas', { 'aria-label': 'The Gaussians rendered at the magnification' });
   const wrap = el('div', { class: 'twoup' }, el('div', {}, left, el('div', { class: 'mu' }, 'THE 40 × 26 PIXELS, MAGNIFIED')), el('div', {}, right, el('div', { class: 'mu' }, 'THE SAME GAUSSIANS RENDERED AT S×')));
   stage.append(wrap);
@@ -356,21 +361,21 @@ function demoAnyRes(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void 
     tmp.getContext('2d')!.putImageData(base, 0, 0);
     gl.drawImage(tmp, 0, 0, w, hh);
     const img = render(S);
-    gr.putImageData(edge && S >= 2 ? edgePass(img, S) : img, 0, 0);
+    gr.putImageData(edge && S >= 2 ? new ImageData(edgePass(img.data, w, hh, S), w, hh) : img, 0, 0);
     sLabel.textContent = `S = ${S}×${edge ? (S >= 2 ? ' · edge pass on' : ' · edge pass from 2×') : ''}`;
   };
   let clock = 0, last = 0;
   const loop = new Loop(stage, motion, (_now, dt) => { clock += dt; const s = Math.round(1 + 7 * (0.5 - 0.5 * Math.cos(clock * 0.5))); if (s !== last) { last = s; S = s; sS.value = String(S); draw(); } });
   loop.playButton(ctl);
   const sS = slider(ctl, 'S', 1, 8, 1, S, (v) => `${v}×`, (v) => { S = v; loop.pause(); draw(); });
-  toggle(ctl, 'edge pass (1.4 px)', false, (v) => { edge = v; draw(); });
+  toggle(ctl, 'edge pass (1.4 px)', true, (v) => { edge = v; draw(); });
   const sLabel = el('span', { class: 'mu' });
   ctl.append(sLabel);
   draw();
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// F. Sinkhorn with ε-scaling on a 48-bin problem: the transport plan sharpens into the map as ε shrinks.
+// sinkhorn — Sinkhorn with ε-scaling on a 48-bin problem: the transport plan sharpens into the map as ε shrinks.
 // ---------------------------------------------------------------------------------------------------------------
 function demoSinkhorn(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
   const n = 48;
@@ -422,7 +427,7 @@ function demoSinkhorn(stage: HTMLElement, ctl: HTMLElement, motion: Motion): voi
     for (let i = 0; i < n; i++) { let s = 0, m = 0; for (let j = 0; j < n; j++) { s += P[i * n + j] * (j + 0.5); m += P[i * n + j]; } const y = Y0 + (s / m) * cell, x = X0 + (i + 0.5) * cell; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
     ctx.stroke();
     ctx.fillStyle = muted; ctx.font = '500 10px ui-monospace, Consolas, monospace';
-    ctx.fillText('x: the uniform lattice →', X0, Y0 + SZ + 36);
+    ctx.fillText('x: the uniform mesh →', X0, Y0 + SZ + 36);
     ctx.save(); ctx.translate(14, Y0 + SZ); ctx.rotate(-Math.PI / 2); ctx.fillText('y: the target density ρ →', 0, 0); ctx.restore();
     ctx.fillStyle = ink; ctx.font = '700 11px ui-monospace, Consolas, monospace';
     ctx.fillText(`STAGE ${stageIdx + 1} / ${stages.length} · ε = ${epsNow.toExponential(1)}`, X0 + SZ + 24, Y0 + 16);
@@ -438,7 +443,7 @@ function demoSinkhorn(stage: HTMLElement, ctl: HTMLElement, motion: Motion): voi
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Shared: the synthetic transport map of the lattice demos (the gradient of a convex potential: a ridge and blobs).
+// Shared: the synthetic transport map of the mesh demos (the gradient of a convex potential: a ridge and blobs).
 // ---------------------------------------------------------------------------------------------------------------
 interface Bump { x: number; y: number; s: number; a: number }
 
@@ -469,8 +474,8 @@ function ellipseOf(j11: number, j12: number, j21: number, j22: number, h: number
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// G. Error-driven re-layout: the lattice of the first map moves on to a second density that has more mass where the
-// error of a short fit remains.
+// relayout — the error-driven re-layout: the mesh of the first map moves on to a second density that has more mass
+// where the error of a short fit remains.
 // ---------------------------------------------------------------------------------------------------------------
 function demoRelayout(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
   const W = 640, H = 424, COLS = 17, ROWS = 11, X0 = 40, Y0 = 36, PW = 560, PH = 330;
@@ -481,7 +486,7 @@ function demoRelayout(stage: HTMLElement, ctl: HTMLElement, motion: Motion): voi
   const pts: [number, number][] = [];
   for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) pts.push([X0 + (j * PW) / (COLS - 1), Y0 + (i * PH) / (ROWS - 1)]);
   const A = pts.map(([x, y]) => m1.T(x, y)), B = pts.map(([x, y]) => m2.T(x, y));
-  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'A lattice moving from the layout of the importance density to the layout of the error-driven density' });
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'A mesh moving from the layout of the importance density to the layout of the error-driven density' });
   svg.append(svgEl('path', { d: Array.from({ length: 41 }, (_, k) => `${k ? 'L' : 'M'}${(X0 + (k * PW) / 40).toFixed(1)} ${m1.ridge(X0 + (k * PW) / 40).toFixed(1)}`).join(' '), class: 'cu2', 'stroke-width': 2, 'stroke-dasharray': '6 5', opacity: 0.8, fill: 'none' }));
   svg.append(svgEl('circle', { cx: blob1.x, cy: blob1.y, r: blob1.s, class: 'cu2', 'stroke-dasharray': '4 5', opacity: 0.6, fill: 'none' }));
   const errGlow = svgEl('circle', { cx: err.x, cy: err.y, r: err.s * 1.3, class: 'cuf', stroke: 'none', opacity: 0 });
@@ -503,7 +508,7 @@ function demoRelayout(stage: HTMLElement, ctl: HTMLElement, motion: Motion): voi
     cur.forEach((p, k) => { dots[k].setAttribute('cx', p[0].toFixed(1)); dots[k].setAttribute('cy', p[1].toFixed(1)); });
     errGlow.setAttribute('opacity', (0.22 * glow).toFixed(2));
     errLabel.setAttribute('opacity', glow.toFixed(2));
-    label.textContent = u < 0.02 ? 'the first layout: the lattice of the importance density ρ' : u > 0.98 ? 'the second layout: more cells where the error remained, fewer in the flat regions' : `moving to the second transport · ${Math.round(u * 100)} %`;
+    label.textContent = u < 0.02 ? 'the first layout: the mesh of the importance density ρ' : u > 0.98 ? 'the second layout: more cells where the error remained, fewer in the flat regions' : `moving to the second transport · ${Math.round(u * 100)} %`;
   };
   let phase = 0;
   const loop = new Loop(stage, motion, (_now, dt) => {
@@ -519,132 +524,425 @@ function demoRelayout(stage: HTMLElement, ctl: HTMLElement, motion: Motion): voi
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// H. Equal shares in two dimensions: a real entropic transport of a uniform lattice onto a density, against samples
-// of the same density; every point's nearest-centre cell coloured by the share of the density it carries.
+// shares2d — equal shares in two dimensions: a real entropic transport of a uniform mesh onto a density, against
+// samples of the same density; every point's nearest-centre cell coloured by the share of the density it carries.
 // ---------------------------------------------------------------------------------------------------------------
 function demoShares2d(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
-  const NX = 36, NY = 24; // transport grid
-  const LX = 12, LY = 8; // lattice
+  const NX = 36, NY = 24, BW = 1.5, BH = 1; // the transport grid on the box [0, 1.5] × [0, 1]
+  const LX = 12, LY = 8; // the mesh
   const K = LX * LY;
-  // the density on the grid (box [0,1.5] x [0,1])
-  const rho = new Float64Array(NX * NY);
   const dens = (x: number, y: number) => {
-    const ry = 0.55 + 0.17 * Math.sin(x * 2.6 - 0.4);
-    const d = y - ry;
+    const d = y - (0.55 + 0.17 * Math.sin(x * 2.6 - 0.4));
     return 0.18 + 2.6 * Math.exp(-(d * d) / (2 * 0.045 * 0.045)) + 1.6 * Math.exp(-((x - 1.17) ** 2 + (y - 0.27) ** 2) / (2 * 0.09 * 0.09));
   };
+  const xs = new Float64Array(NX).map((_, i) => ((i + 0.5) / NX) * BW), ys = new Float64Array(NY).map((_, j) => ((j + 0.5) / NY) * BH);
+  const rho = new Float64Array(NX * NY);
   let tot = 0;
-  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const v = dens(((i + 0.5) / NX) * 1.5, (j + 0.5) / NY); rho[j * NX + i] = v; tot += v; }
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const v = dens(xs[i], ys[j]); rho[j * NX + i] = v; tot += v; }
   for (let k = 0; k < NX * NY; k++) rho[k] /= tot;
-  // separable log-domain Sinkhorn: uniform -> rho, eps-scaling
-  const xs = Array.from({ length: NX }, (_, i) => ((i + 0.5) / NX) * 1.5), ys = Array.from({ length: NY }, (_, j) => (j + 0.5) / NY);
-  const f = new Float64Array(NX * NY), g = new Float64Array(NX * NY);
-  const logmu = Math.log(1 / (NX * NY));
-  const tmp = new Float64Array(NX * NY);
-  const lseRow = (src: Float64Array, dst: Float64Array, eps: number, sign: number) => {
-    // dst[j*NX+i] = eps * log sum_{i'} exp((src[j*NX+i'] - (x_i - x_i')²)/eps) then along y
-    const t2 = new Float64Array(NX * NY);
-    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
-      let m = -Infinity; for (let i2 = 0; i2 < NX; i2++) m = Math.max(m, (src[j * NX + i2] - (xs[i] - xs[i2]) ** 2) / eps);
-      let s = 0; for (let i2 = 0; i2 < NX; i2++) s += Math.exp((src[j * NX + i2] - (xs[i] - xs[i2]) ** 2) / eps - m);
-      t2[j * NX + i] = eps * (m + Math.log(s));
-    }
-    for (let i = 0; i < NX; i++) for (let j = 0; j < NY; j++) {
-      let m = -Infinity; for (let j2 = 0; j2 < NY; j2++) m = Math.max(m, (t2[j2 * NX + i] - (ys[j] - ys[j2]) ** 2) / eps);
-      let s = 0; for (let j2 = 0; j2 < NY; j2++) s += Math.exp((t2[j2 * NX + i] - (ys[j] - ys[j2]) ** 2) / eps - m);
-      dst[j * NX + i] = sign * eps * (m + Math.log(s));
-    }
-  };
-  let eps = 1.5 * 1.5;
-  const epsEnd = (1.5 / NX * 1.5) ** 2;
-  while (eps > epsEnd) {
-    for (let it = 0; it < 6; it++) {
-      lseRow(g, tmp, eps, 1); for (let k = 0; k < NX * NY; k++) f[k] = eps * logmu - tmp[k];
-      lseRow(f, tmp, eps, 1); for (let k = 0; k < NX * NY; k++) g[k] = eps * Math.log(rho[k]) - tmp[k];
-    }
-    eps *= 0.6;
-  }
-  eps = epsEnd;
-  for (let it = 0; it < 30; it++) {
-    lseRow(g, tmp, eps, 1); for (let k = 0; k < NX * NY; k++) f[k] = eps * logmu - tmp[k];
-    lseRow(f, tmp, eps, 1); for (let k = 0; k < NX * NY; k++) g[k] = eps * Math.log(rho[k]) - tmp[k];
-  }
-  // barycentric projection on the grid (dense, once)
-  const TX = new Float64Array(NX * NY), TY = new Float64Array(NX * NY);
-  for (let a = 0; a < NX * NY; a++) {
-    const xa = xs[a % NX], ya = ys[(a / NX) | 0];
-    let m = -Infinity; const vals = new Float64Array(NX * NY);
-    for (let b = 0; b < NX * NY; b++) { const xb = xs[b % NX], yb = ys[(b / NX) | 0]; vals[b] = (f[a] + g[b] - (xa - xb) ** 2 - (ya - yb) ** 2) / eps; if (vals[b] > m) m = vals[b]; }
-    let s = 0, sx = 0, sy = 0;
-    for (let b = 0; b < NX * NY; b++) { const p = Math.exp(vals[b] - m); s += p; sx += p * xs[b % NX]; sy += p * ys[(b / NX) | 0]; }
-    TX[a] = sx / s; TY[a] = sy / s;
-  }
-  const mapAt = (x: number, y: number): [number, number] => {
-    const u = Math.max(0, Math.min(NX - 1.001, (x / 1.5) * NX - 0.5)), v = Math.max(0, Math.min(NY - 1.001, y * NY - 0.5));
-    const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j;
-    const at = (arr: Float64Array, ii: number, jj: number) => arr[jj * NX + ii];
-    const lerp = (arr: Float64Array) => (at(arr, i, j) * (1 - fu) + at(arr, i + 1, j) * fu) * (1 - fv) + (at(arr, i, j + 1) * (1 - fu) + at(arr, i + 1, j + 1) * fu) * fv;
-    return [lerp(TX), lerp(TY)];
-  };
-  const lattice: [number, number][] = [];
-  for (let j = 0; j < LY; j++) for (let i = 0; i < LX; i++) lattice.push(mapAt(((i + 0.5) / LX) * 1.5, (j + 0.5) / LY));
-  // sampling rho: inverse CDF over the cells
-  const cdf = new Float64Array(NX * NY); let acc = 0; for (let k = 0; k < NX * NY; k++) { acc += rho[k]; cdf[k] = acc; }
-  const sample = (): [number, number] => { const r = Math.random(); let lo = 0, hi = NX * NY - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cdf[m] < r) lo = m + 1; else hi = m; } return [((lo % NX) + Math.random()) / NX * 1.5, (((lo / NX) | 0) + Math.random()) / NY]; };
-  // cell masses on the transport grid: nearest centre
+  const grid: Grid = { NX, NY, xs, ys, rho };
+  // sampling ρ: the inverse CDF over the cells
+  const cdf = new Float64Array(NX * NY);
+  let acc = 0;
+  for (let k = 0; k < NX * NY; k++) { acc += rho[k]; cdf[k] = acc; }
+  const sample = (): [number, number] => { const r = Math.random(); let lo = 0, hi = NX * NY - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cdf[m] < r) lo = m + 1; else hi = m; } return [(((lo % NX) + Math.random()) / NX) * BW, ((((lo / NX) | 0) + Math.random()) / NY) * BH]; };
+  // the mass of every point's nearest-centre cell, on the grid
   const masses = (pts: [number, number][]) => {
-    const m = new Float64Array(pts.length); const owner = new Int16Array(NX * NY);
+    const m = new Float64Array(pts.length), owner = new Int16Array(NX * NY);
     for (let k = 0; k < NX * NY; k++) {
       const x = xs[k % NX], y = ys[(k / NX) | 0];
       let best = 0, bd = Infinity;
       for (let p = 0; p < pts.length; p++) { const d = (pts[p][0] - x) ** 2 + (pts[p][1] - y) ** 2; if (d < bd) { bd = d; best = p; } }
-      owner[k] = best; m[best] += rho[k] * pts.length;
+      owner[k] = best;
+      m[best] += rho[k] * pts.length;
     }
     return { m, owner };
   };
   const W = 640, H = 300, PW = 300, PH = 200, Y0 = 34;
-  const canvas = el('canvas', { width: '1280', height: '600', 'aria-label': 'Two point sets on the same density, the lattice of the transport map and random samples, with their cells coloured by the share they carry' });
-  canvas.style.width = '100%'; canvas.style.aspectRatio = `${W} / ${H}`;
+  const canvas = el('canvas', { width: '1280', height: '600', 'aria-label': 'Two point sets on the same density, the mesh of the transport map and random samples, with their cells coloured by the share they carry' });
+  canvas.style.width = '100%';
+  canvas.style.aspectRatio = `${W} / ${H}`;
   stage.append(canvas);
   const ctx = canvas.getContext('2d')!;
+  let mesh: [number, number][] | null = null;
   let samples: [number, number][] = [];
   const stats = (m: Float64Array) => { const mean = m.reduce((s, v) => s + v, 0) / m.length; const cv = Math.sqrt(m.reduce((s, v) => s + (v - mean) ** 2, 0) / m.length) / mean; const under = m.reduce((s, v) => s + (v > 2 ? v : 0), 0) / m.length; const red = m.filter((v) => v < 0.25).length / m.length; return { cv, under, red }; };
   const panel = (px: number, pts: [number, number][], title: string) => {
     const { m, owner } = masses(pts);
     const cw = PW / NX, ch = PH / NY;
     for (let k = 0; k < NX * NY; k++) {
-      const v = Math.log2(Math.max(0.05, m[owner[k]]));
-      const t = Math.max(-1, Math.min(1, v / 1.6));
-      // blue: redundant (below the share), white: fair share, red: under-served
+      const t = Math.max(-1, Math.min(1, Math.log2(Math.max(0.05, m[owner[k]])) / 1.6));
+      // blue: redundant (below the share), white: the fair share, red: under-served
       const r = t > 0 ? 200 : 200 - 110 * -t, gg = 200 - 120 * Math.abs(t), b = t < 0 ? 215 : 215 - 140 * t;
       ctx.fillStyle = `rgba(${r | 0},${gg | 0},${b | 0},0.9)`;
       ctx.fillRect(px + (k % NX) * cw, Y0 + ((k / NX) | 0) * ch, cw + 0.5, ch + 0.5);
     }
     ctx.strokeStyle = cssVar('--faint', '#a3a59d'); ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, Y0 + 0.5, PW, PH);
     ctx.fillStyle = cssVar('--ink', '#111312');
-    for (const [x, y] of pts) { ctx.beginPath(); ctx.arc(px + (x / 1.5) * PW, Y0 + y * PH, 2.1, 0, 2 * Math.PI); ctx.fill(); }
+    for (const [x, y] of pts) { ctx.beginPath(); ctx.arc(px + (x / BW) * PW, Y0 + (y / BH) * PH, 2.1, 0, 2 * Math.PI); ctx.fill(); }
     const s = stats(m);
     ctx.font = '700 11px ui-monospace, Consolas, monospace'; ctx.fillText(title, px, Y0 - 10);
     ctx.font = '500 10px ui-monospace, Consolas, monospace'; ctx.fillStyle = cssVar('--muted', '#6f726a');
     ctx.fillText(`CV ${s.cv.toFixed(2)} · under-served mass ${(s.under * 100).toFixed(0)} % · redundant ${(s.red * 100).toFixed(0)} %`, px, Y0 + PH + 18);
   };
   const draw = (resample: boolean) => {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = cssVar('--muted', '#6f726a'); ctx.font = '500 10px ui-monospace, Consolas, monospace';
+    if (!mesh) { ctx.fillText('solving the transport …', 14, 40); return; }
     if (resample || !samples.length) samples = Array.from({ length: K }, sample);
-    ctx.setTransform(2, 0, 0, 2, 0, 0); ctx.clearRect(0, 0, W, H);
-    panel(14, lattice, `OT LATTICE, K = ${K}`);
+    panel(14, mesh, `OT MESH, K = ${K}`);
     panel(326, samples, `SAMPLES OF THE SAME DENSITY, K = ${K}`);
     ctx.fillStyle = cssVar('--muted', '#6f726a'); ctx.font = '500 10px ui-monospace, Consolas, monospace';
     ctx.fillText('cells: nearest centre · white = the fair share 1/K · red = carries more than its share · blue = less (redundant)', 14, H - 8);
   };
+  draw(false);
+  onFirstVisible(stage, () => {
+    void sinkhornMap(grid, BW * BW, ((1.5 * BW) / NX) ** 2).then(({ TX, TY }) => {
+      const pts: [number, number][] = [];
+      for (let j = 0; j < LY; j++) for (let i = 0; i < LX; i++) pts.push(mapAt(grid, TX, TY, ((i + 0.5) / LX) * BW, ((j + 0.5) / LY) * BH, BW, BH));
+      mesh = pts;
+      draw(true);
+    });
+  });
   let clock = 0;
-  const loop = new Loop(stage, motion, (_now, dt) => { clock += dt; if (clock > 2.6) { clock = 0; draw(true); } });
+  const loop = new Loop(stage, motion, (_now, dt) => { clock += dt; if (clock > 2.6 && mesh) { clock = 0; draw(true); } });
   loop.playButton(ctl);
   button(ctl, 'Draw again', () => draw(true));
-  draw(true);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// I. Editing through the lattice: drag a vertex, its neighbours follow with a smooth fall-off, every Gaussian's shape
+// stages — Figure A, live: the six stages of the pipeline under the six boxes of the diagram, run in the page on a
+// small copy of the app's sample picture: the picture, its importance density on the transport grid, a real entropic
+// transport and the mesh unfolding along it, the Gaussians of the mesh in the vector view, a real fit (the blend of the
+// engine, exact gradients, Adam with the paper's schedule) and a crop rendered at S× with the edge pass, against its
+// pixels. The first time the figure comes into view the strip shows the computation as it happens; after that it
+// replays the stages in a loop.
+// ---------------------------------------------------------------------------------------------------------------
+const PIC_W = 112; // width of the picture the strip works on (pixels): one pixel per unit of the diagram
+const PIC_BUDGET = 0.25; // Gaussians per pixel
+const PIC_STEPS = 400; // fitting steps
+const PIC_EVERY = 20; // a frame of the fit every this many steps
+
+interface Picture { W: number; H: number; rgb: Float64Array; rgba: Uint8ClampedArray<ArrayBuffer>; name: string }
+
+/** The first sample picture of the app (samples/index.json), or a small drawing when there is none. */
+async function loadPicture(W: number): Promise<Picture> {
+  let bmp: ImageBitmap | null = null;
+  let name = 'a drawn picture';
+  try {
+    const list = (await (await fetch('samples/index.json')).json()) as { file: string }[];
+    if (list.length) {
+      const r = await fetch(`samples/${list[0].file}`);
+      if (r.ok) { bmp = await createImageBitmap(await r.blob()); name = list[0].file; }
+    }
+  } catch {
+    /* the drawing below */
+  }
+  const H = bmp ? Math.max(16, Math.round((W * bmp.height) / bmp.width)) : Math.round(W * 0.78);
+  const c = el('canvas', { width: String(W), height: String(H) });
+  const g = c.getContext('2d')!;
+  if (bmp) {
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bmp, 0, 0, W, H);
+    bmp.close();
+  } else {
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#cfe3f2');
+    sky.addColorStop(1, '#f6e3d3');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    g.lineWidth = 1.2;
+    g.strokeStyle = '#1d1a24';
+    g.fillStyle = '#f7dcc8'; g.beginPath(); g.ellipse(W * 0.5, H * 0.58, W * 0.2, H * 0.3, 0, 0, 2 * Math.PI); g.fill(); g.stroke();
+    g.fillStyle = '#3a3150'; g.beginPath(); g.ellipse(W * 0.5, H * 0.4, W * 0.23, H * 0.2, 0, Math.PI, 2 * Math.PI); g.fill(); g.stroke();
+    for (const sgn of [-1, 1]) {
+      g.fillStyle = '#2b2f5c'; g.beginPath(); g.ellipse(W * (0.5 + sgn * 0.08), H * 0.58, W * 0.035, H * 0.07, 0, 0, 2 * Math.PI); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(W * (0.49 + sgn * 0.08), H * 0.55, W * 0.012, 0, 2 * Math.PI); g.fill();
+    }
+    g.beginPath(); g.arc(W * 0.5, H * 0.72, W * 0.03, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  }
+  const img = g.getImageData(0, 0, W, H);
+  const rgba = new Uint8ClampedArray(new ArrayBuffer(4 * W * H));
+  rgba.set(img.data);
+  const rgb = new Float64Array(3 * W * H);
+  for (let i = 0; i < W * H; i++) for (let ch = 0; ch < 3; ch++) rgb[3 * i + ch] = rgba[4 * i + ch] / 255;
+  return { W, H, rgb, rgba, name };
+}
+
+function demoStages(stage: HTMLElement, ctl: HTMLElement, motion: Motion): void {
+  const fig = stage.closest('figure') as HTMLElement | null;
+  const boxes = [...stage.querySelectorAll<SVGGraphicsElement>('[data-stage]')];
+  const UW = 760, SC = 3, PW = 112, PY = 18;
+  const PX = (i: number) => 12 + i * 125; // the six boxes of the diagram above
+  let PH = 89, UH = PY + PH + 20;
+  const canvas = el('canvas', { 'aria-label': 'The six stages of the pipeline, computed in the page on a small copy of the sample picture' });
+  canvas.style.marginTop = '4px';
+  stage.append(canvas);
+  const g = canvas.getContext('2d')!;
+  const size = () => { canvas.width = UW * SC; canvas.height = Math.round(UH * SC); canvas.style.aspectRatio = `${UW} / ${UH}`; };
+  size();
+  const status = el('span', { class: 'mu' }, 'STARTS WHEN THIS FIGURE COMES INTO VIEW');
+  ctl.append(status);
+  // what is on the strip
+  let pic: Picture | null = null;
+  const content: (HTMLCanvasElement | null)[] = [null, null, null, null, null, null];
+  const alpha = [0, 0, 0, 0, 0, 0];
+  const reads = ['—', '—', '—', '—', '—', '—'];
+  let active = -1;
+  let mesh: Mesh | null = null;
+  let meshT = 0;
+  const frames: { c: HTMLCanvasElement; step: number; db: number }[] = [];
+  let frameIdx = 0;
+  let crop: { x: number; y: number; w: number; h: number; S: number } | null = null;
+  let cropPix: HTMLCanvasElement | null = null, cropOt: HTMLCanvasElement | null = null;
+  let sweep = 1;
+
+  const panel = (i: number, x: number) => {
+    if (!pic) return;
+    if (i === 0 && content[0]) {
+      g.imageSmoothingEnabled = false;
+      g.drawImage(content[0], x, PY, PW, PH);
+      if (crop && alpha[5] > 0) {
+        g.strokeStyle = cssVar('--copper', '#b8793c'); g.lineWidth = 0.8;
+        g.strokeRect(x + (crop.x * PW) / pic.W, PY + (crop.y * PH) / pic.H, (crop.w * PW) / pic.W, (crop.h * PH) / pic.H);
+      }
+    } else if (i === 1 && content[1]) {
+      g.imageSmoothingEnabled = false;
+      g.drawImage(content[1], x, PY, PW, PH);
+    } else if (i === 2) {
+      if (content[0]) { const a = g.globalAlpha; g.globalAlpha = a * 0.3; g.imageSmoothingEnabled = true; g.drawImage(content[0], x, PY, PW, PH); g.globalAlpha = a; }
+      if (mesh) {
+        const { gx, gy, uni, pos } = mesh;
+        const st = Math.max(1, Math.round(gx / 18));
+        const sx = PW / pic.W, sy = PH / pic.H;
+        const at = (k: number): [number, number] => [x + (uni[2 * k] + (pos[2 * k] - uni[2 * k]) * meshT) * sx, PY + (uni[2 * k + 1] + (pos[2 * k + 1] - uni[2 * k + 1]) * meshT) * sy];
+        g.strokeStyle = cssVar('--copper', '#b8793c'); g.lineWidth = 0.55;
+        g.beginPath();
+        for (let r = 0; r < gy; r += st) for (let c = 0; c < gx; c++) { const [px, py] = at(r * gx + c); if (c) g.lineTo(px, py); else g.moveTo(px, py); }
+        for (let c = 0; c < gx; c += st) for (let r = 0; r < gy; r++) { const [px, py] = at(r * gx + c); if (r) g.lineTo(px, py); else g.moveTo(px, py); }
+        g.stroke();
+      }
+    } else if (i === 3 && content[3]) {
+      g.imageSmoothingEnabled = true;
+      g.drawImage(content[3], x, PY, PW, PH);
+    } else if (i === 4 && frames.length) {
+      g.imageSmoothingEnabled = true;
+      g.drawImage(frames[frameIdx].c, x, PY, PW, PH);
+    } else if (i === 5 && cropPix && cropOt) {
+      g.imageSmoothingEnabled = false;
+      g.drawImage(cropPix, x, PY, PW, PH);
+      const sx = x + PW * sweep;
+      g.save();
+      g.beginPath(); g.rect(sx, PY, x + PW - sx, PH); g.clip();
+      g.imageSmoothingEnabled = true;
+      g.drawImage(cropOt, x, PY, PW, PH);
+      g.restore();
+      g.strokeStyle = '#ffffff'; g.lineWidth = 0.9;
+      g.beginPath(); g.moveTo(sx, PY); g.lineTo(sx, PY + PH); g.stroke();
+      g.font = '600 6.5px ui-monospace, Consolas, monospace';
+      const chip = (label: string, cx: number, align: 'left' | 'right') => {
+        const w = g.measureText(label).width + 6;
+        const x0 = align === 'left' ? cx : cx - w;
+        g.fillStyle = 'rgba(237,235,228,0.9)'; g.fillRect(x0, PY + 3, w, 9);
+        g.fillStyle = '#111312'; g.fillText(label, x0 + 3, PY + 9.8);
+      };
+      if (sweep > 0.22) chip('PIXELS', x + 3, 'left');
+      if (sweep < 0.78) chip('OTSR', x + PW - 3, 'right');
+    }
+  };
+
+  const draw = () => {
+    g.setTransform(SC, 0, 0, SC, 0, 0);
+    g.clearRect(0, 0, UW, UH);
+    const faint = cssVar('--faint', '#a3a59d'), muted = cssVar('--muted', '#6f726a'), cu = cssVar('--copper', '#b8793c'), paper = cssVar('--bg', '#ebebe8');
+    for (let i = 0; i < 6; i++) {
+      const x = PX(i), on = i === active;
+      g.strokeStyle = on ? cu : faint; g.lineWidth = 0.8; g.setLineDash([2, 3]);
+      g.beginPath(); g.moveTo(x + PW / 2, 1); g.lineTo(x + PW / 2, PY - 4); g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = paper; g.fillRect(x, PY, PW, PH);
+      if (alpha[i] > 0.002) {
+        g.save();
+        g.globalAlpha = alpha[i];
+        g.beginPath(); g.rect(x, PY, PW, PH); g.clip();
+        panel(i, x);
+        g.restore();
+      }
+      g.strokeStyle = on ? cu : faint; g.lineWidth = on ? 1.6 : 0.8;
+      g.strokeRect(x, PY, PW, PH);
+      g.fillStyle = on ? cu : muted;
+      g.font = '500 8.5px ui-monospace, Consolas, monospace';
+      g.fillText(reads[i], x, PY + PH + 12);
+    }
+    boxes.forEach((b, i) => { b.style.stroke = i === active ? cu : ''; b.style.strokeWidth = i === active ? '2.4' : ''; });
+  };
+
+  /** Plays f(u), u from 0 to 1, over `ms` (at once without motion). */
+  const animate = (ms: number, f: (u: number) => void) => new Promise<void>((resolve) => {
+    if (!motion()) { f(1); draw(); resolve(); return; }
+    const t0 = performance.now();
+    const frame = () => { const u = Math.min(1, (performance.now() - t0) / ms); f(u); draw(); if (u < 1) requestAnimationFrame(frame); else resolve(); };
+    requestAnimationFrame(frame);
+  });
+
+  const heat = (grid: Grid) => {
+    const { NX, NY, rho } = grid;
+    let lo = Infinity, hi = -Infinity;
+    for (const v of rho) { const l = Math.log(v); if (l < lo) lo = l; if (l > hi) hi = l; }
+    const rgba = new Uint8ClampedArray(new ArrayBuffer(4 * NX * NY));
+    const a = [246, 243, 236], b = [184, 121, 60], c = [70, 40, 16];
+    for (let k = 0; k < NX * NY; k++) {
+      const t = (Math.log(rho[k]) - lo) / Math.max(1e-9, hi - lo);
+      const [p, q, u] = t < 0.6 ? [a, b, t / 0.6] : [b, c, (t - 0.6) / 0.4];
+      for (let ch = 0; ch < 3; ch++) rgba[4 * k + ch] = p[ch] + (q[ch] - p[ch]) * u;
+      rgba[4 * k + 3] = 255;
+    }
+    return toCanvas(rgba, NX, NY);
+  };
+
+  const run = async () => {
+    const t0 = performance.now();
+    if (fig) fig.dataset.state = 'running';
+    status.textContent = 'LOADING THE PICTURE …';
+    const p = await loadPicture(PIC_W);
+    pic = p;
+    const { W, H } = p;
+    PH = (PW * H) / W;
+    UH = PY + PH + 20;
+    size();
+    const dw = PW * SC, dh = Math.round(PH * SC);
+    // 1 · the picture
+    content[0] = toCanvas(p.rgba, W, H);
+    reads[0] = `${W} × ${H} px`;
+    active = 0;
+    await animate(450, (u) => { alpha[0] = u; });
+    // 2 · the density on the transport grid
+    const K = Math.round(PIC_BUDGET * W * H);
+    const gx0 = Math.max(2, Math.round(Math.sqrt((K * W) / H))), N0 = gx0 * Math.max(2, Math.round(K / gx0));
+    const lambda = Math.min(0.3, Math.max(0.1, 0.3 - 0.2 * (Math.log2(Math.sqrt((W * H) / N0)) - 2)));
+    const grid = densityGrid(p.rgb, W, H, 4, lambda);
+    content[1] = heat(grid);
+    reads[1] = `ρ · ${grid.NX} × ${grid.NY} cells`;
+    active = 1;
+    await animate(450, (u) => { alpha[1] = u; });
+    // 3 · the transport, then the mesh unfolding along it
+    active = 2;
+    alpha[2] = 1;
+    reads[2] = 'solving …';
+    draw();
+    const L = Math.max(W, H);
+    const { TX, TY } = await sinkhornMap(grid, L * L, (1.5 * (W / grid.NX)) ** 2, (k, n) => { reads[2] = `ε stage ${k} / ${n}`; status.textContent = `OPTIMAL TRANSPORT · ε STAGE ${k} / ${n}`; draw(); });
+    const built = meshGaussians(grid, TX, TY, p.rgb, W, H, K);
+    mesh = built.mesh;
+    reads[2] = `${mesh.gx} × ${mesh.gy} mesh`;
+    status.textContent = 'THE MESH UNFOLDS ALONG THE MAP';
+    await animate(1600, (u) => { meshT = ease(u); });
+    // 4 · the Gaussians of the mesh, each in a random colour × its luma
+    const P = built.P;
+    const N = mesh.N;
+    const fitter = new Fitter(P, p.rgb, W, H);
+    const db0 = psnr(fitter.evaluate());
+    content[3] = toCanvas(renderGaussians(P, 0, 0, dw / W, dw, dh, vectorColours(P)), dw, dh);
+    reads[3] = `${N} G · ${db0.toFixed(1)} dB`;
+    active = 3;
+    await animate(500, (u) => { alpha[3] = u; });
+    // 5 · the fit, live
+    active = 4;
+    alpha[4] = 1;
+    const capture = (step: number, db: number) => {
+      frames.push({ c: toCanvas(renderGaussians(P, 0, 0, dw / W, dw, dh), dw, dh), step, db });
+      frameIdx = frames.length - 1;
+      reads[4] = `step ${step} · ${db.toFixed(1)} dB`;
+      status.textContent = `FITTING · STEP ${step} / ${PIC_STEPS} · ${db.toFixed(1)} DB`;
+    };
+    capture(0, db0);
+    draw();
+    await tick();
+    let step = 0;
+    while (step < PIC_STEPS) {
+      const c0 = performance.now();
+      while (step < PIC_STEPS && performance.now() - c0 < 14) {
+        fitter.step(PIC_STEPS);
+        step++;
+        if (step % PIC_EVERY === 0 && step < PIC_STEPS) { capture(step, psnr(fitter.evaluate())); break; }
+      }
+      draw();
+      await tick();
+    }
+    const dbEnd = psnr(fitter.evaluate());
+    capture(PIC_STEPS, dbEnd);
+    draw();
+    // 6 · a crop at S× with the edge pass, where the picture has the most edges, against its pixels
+    const cw = Math.round(W / 4), ch = (cw * H) / W, chI = Math.ceil(ch);
+    const I = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) I[(y + 1) * (W + 1) + x + 1] = grid.g[y * W + x] + I[y * (W + 1) + x + 1] + I[(y + 1) * (W + 1) + x] - I[y * (W + 1) + x];
+    let best = -1, wx = 0, wy = 0;
+    for (let y = 0; y + chI <= H; y++) for (let x = 0; x + cw <= W; x++) {
+      const e = I[(y + chI) * (W + 1) + x + cw] - I[y * (W + 1) + x + cw] - I[(y + chI) * (W + 1) + x] + I[y * (W + 1) + x];
+      if (e > best) { best = e; wx = x; wy = y; }
+    }
+    const S = dw / cw;
+    crop = { x: wx, y: wy, w: cw, h: ch, S };
+    cropOt = toCanvas(edgePass(renderGaussians(P, wx, wy, S, dw, dh), dw, dh, S), dw, dh);
+    cropPix = el('canvas', { width: String(dw), height: String(dh) });
+    const cg = cropPix.getContext('2d')!;
+    cg.imageSmoothingEnabled = false;
+    cg.drawImage(content[0], wx, wy, cw, ch, 0, 0, dw, dh);
+    reads[5] = `${S}× · pixels | OTSR`;
+    active = 5;
+    sweep = 1;
+    await animate(400, (u) => { alpha[5] = u; });
+    await animate(1800, (u) => { sweep = 1 - 0.5 * ease(u); });
+    active = -1;
+    draw();
+    const secs = (performance.now() - t0) / 1000;
+    status.textContent = `COMPUTED IN THE PAGE IN ${secs.toFixed(1)} S · ${N} GAUSSIANS · ${dbEnd.toFixed(1)} DB`;
+    if (fig) fig.dataset.state = 'done';
+    // from now on the stages replay in a loop, starting from the hold at the end
+    const TOTAL = 13;
+    let tau = 11.4;
+    const loop = new Loop(stage, motion, (_now, dt) => {
+      tau += dt;
+      if (tau > TOTAL) tau = 0;
+      const set = (a: number[]) => a.forEach((v, i) => { alpha[i] = v; });
+      if (tau < 0.6) { active = 0; set([ease(tau / 0.6), 0, 0, 0, 0, 0]); meshT = 0; frameIdx = 0; sweep = 1; }
+      else if (tau < 1.2) { active = 1; set([1, ease((tau - 0.6) / 0.6), 0, 0, 0, 0]); }
+      else if (tau < 3.6) { active = 2; set([1, 1, 1, 0, 0, 0]); meshT = ease((tau - 1.2) / 2.0); }
+      else if (tau < 4.2) { active = 3; set([1, 1, 1, ease((tau - 3.6) / 0.6), 0, 0]); meshT = 1; }
+      else if (tau < 8.6) {
+        active = 4;
+        set([1, 1, 1, 1, 1, 0]);
+        frameIdx = Math.min(frames.length - 1, Math.floor(((tau - 4.2) / 4.0) * (frames.length - 1)));
+        const f = frames[frameIdx];
+        reads[4] = `step ${f.step} · ${f.db.toFixed(1)} dB`;
+      } else if (tau < 11.4) {
+        active = 5;
+        set([1, 1, 1, 1, 1, 1]);
+        frameIdx = frames.length - 1;
+        const u = (tau - 8.6) / 2.8;
+        sweep = u < 0.7 ? 1 - ease(u / 0.7) : 0.5 * ease((u - 0.7) / 0.3);
+      } else { active = -1; set([1, 1, 1, 1, 1, 1]); sweep = 0.5; meshT = 1; frameIdx = frames.length - 1; }
+      if (tau >= 8.6) { const f = frames[frames.length - 1]; reads[4] = `step ${f.step} · ${f.db.toFixed(1)} dB`; }
+      draw();
+    });
+    loop.playButton(ctl);
+    button(ctl, 'Replay', () => { tau = 0; if (!loop.playing) { loop.playing = true; loop.schedule(); } });
+    ctl.append(status); // the status after the buttons
+  };
+
+  draw();
+  onFirstVisible(stage, () => {
+    run().catch((e) => {
+      status.textContent = `COULD NOT RUN: ${(e as Error).message}`;
+      if (fig) fig.dataset.state = 'error';
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// edit — editing through the mesh: drag a vertex, its neighbours follow with a smooth fall-off, every Gaussian's shape
 // follows the local affine map of the mesh; folded cells turn red.
 // ---------------------------------------------------------------------------------------------------------------
 function demoEdit(stage: HTMLElement, ctl: HTMLElement, _motion: Motion): void {
@@ -655,7 +953,7 @@ function demoEdit(stage: HTMLElement, ctl: HTMLElement, _motion: Motion): void {
   for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) uni.push([X0 + (j * PW) / (COLS - 1), Y0 + (i * PH) / (ROWS - 1)]);
   const base = uni.map(([x, y]) => m.T(x, y));
   let cur = base.map((p) => [p[0], p[1]] as [number, number]);
-  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'A lattice of Gaussians that can be dragged; the Gaussians follow the deformation of their cells' });
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'A mesh of Gaussians that can be dragged; the Gaussians follow the deformation of their cells' });
   svg.style.touchAction = 'none';
   svg.style.cursor = 'grab';
   const cells = svgEl('g', { stroke: 'none' });
@@ -692,7 +990,7 @@ function demoEdit(stage: HTMLElement, ctl: HTMLElement, _motion: Motion): void {
       const e = ellipseOf((r[0] - l[0]) / dx, (d[0] - u[0]) / dy, (r[1] - l[1]) / dx, (d[1] - u[1]) / dy, h);
       ells[k].setAttribute('cx', p[0].toFixed(1)); ells[k].setAttribute('cy', p[1].toFixed(1)); ells[k].setAttribute('rx', e.rx.toFixed(1)); ells[k].setAttribute('ry', e.ry.toFixed(1)); ells[k].setAttribute('transform', `rotate(${e.ang.toFixed(1)} ${p[0].toFixed(1)} ${p[1].toFixed(1)})`);
     });
-    label.textContent = folded ? `${folded} folded cell${folded > 1 ? 's' : ''} (red): the mesh is no longer valid there` : 'drag any vertex · neighbours within 72 px follow with a Gaussian fall-off · ellipses: Σ′ = J Σ Jᵀ';
+    label.textContent = folded ? `${folded} folded cell${folded > 1 ? 's' : ''} (red): the mesh is no longer valid there` : 'drag any vertex · neighbours within 72 px follow · ellipses: Σ′ = J Σ Jᵀ';
   };
   let drag: { k: number; start: [number, number][]; x0: number; y0: number } | null = null;
   const pos = (e: PointerEvent): [number, number] => { const r = svg.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H]; };
@@ -725,7 +1023,7 @@ function demoEdit(stage: HTMLElement, ctl: HTMLElement, _motion: Motion): void {
 
 const DEMOS: Record<string, (stage: HTMLElement, ctl: HTMLElement, motion: Motion) => void> = {
   unfold: demoUnfold, shares: demoShares, blend: demoBlend, edge: demoEdge, anyres: demoAnyRes, sinkhorn: demoSinkhorn,
-  relayout: demoRelayout, shares2d: demoShares2d, edit: demoEdit,
+  relayout: demoRelayout, shares2d: demoShares2d, edit: demoEdit, stages: demoStages,
 };
 
 /** Mounts every demo figure on the page. */

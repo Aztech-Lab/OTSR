@@ -1,6 +1,6 @@
 # Citing OTSR
 
-OTSR implements the method of our workshop paper on optimal-transport Gaussian lattices for images (submitted
+OTSR implements the method of our workshop paper on placing the Gaussians of an image by optimal transport (submitted
 October 2026). The bibliographic entry will be added here once the paper is public; until then please cite this
 repository by its URL and the version tag you used.
 

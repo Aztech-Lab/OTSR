@@ -134,7 +134,7 @@ export class Actions {
           onPhase: (ph, i) => {
             if (ph === 'density') progress(-1, `Density ρ (λ = ${i.lam.toFixed(3)}) pooled to ${i.grid.nx} × ${i.grid.ny} cells · ${i.ms.toFixed(0)} ms`);
             else if (ph === 'transport') progress(-1, `Sinkhorn transport map on the GPU · ${i.ms.toFixed(0)} ms`);
-            else progress(-1, `Lattice ${i.gx} × ${i.gy} warped by the map, colours sampled · ${i.ms.toFixed(0)} ms`);
+            else progress(-1, `Mesh ${i.gx} × ${i.gy} warped by the map, colours sampled · ${i.ms.toFixed(0)} ms`);
           },
           onStage: (T, k, n, eps, grid) => {
             show?.otStage(T, grid);

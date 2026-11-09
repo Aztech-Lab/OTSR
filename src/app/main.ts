@@ -36,7 +36,7 @@ const sheetLayout = () => COMPACT.matches && !LANDSCAPE.matches;
 const box = (el: HTMLElement) => ({ left: el.offsetLeft, top: el.offsetTop, right: el.offsetLeft + el.offsetWidth, bottom: el.offsetTop + el.offsetHeight, width: el.offsetWidth, height: el.offsetHeight });
 const LAYER_ROWS: [keyof Layers, string, string, string][] = [
   ['vector', 'Vector view', '矢量視角', 'every Gaussian in a random colour × its luma (V)'],
-  ['ot', 'OT lattice', '傳輸網格', 'the transport lattice of the initialisation over the image (T)'],
+  ['ot', 'OT mesh', '傳輸網格', 'the transport mesh of the initialisation over the image (T)'],
   ['gaussians', 'Gaussians 1σ', '高斯輪廓', 'outline of every Gaussian in its own colour, from 2× zoom (G)'],
   ['error', 'Error map', '誤差圖', '|model − source| per pixel, inferno scale (D)'],
 ];

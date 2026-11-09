@@ -17,7 +17,7 @@ export const SHORTCUTS: [string, string][] = [
   ['0', 'Fit the image to the view'],
   ['1 / 2 / 4 / 8', '100 % / 200 % / 400 % / 800 %'],
   ['M', 'Region tool'],
-  ['V / T', 'View: Gaussian-id colours (vector view) / OT lattice overlay'],
+  ['V / T', 'View: Gaussian-id colours (vector view) / OT mesh overlay'],
   ['G / D', 'View: Gaussian outlines / error map'],
   ['Arrow keys', 'Nudge the region (Shift: 10 px)'],
   ['Space (hold)', 'Pan while in the region tool'],

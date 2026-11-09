@@ -43,22 +43,22 @@ run-to-run noise.
 
 ## 2. Optimal-transport initialisation
 
-Good initial positions matter more than anything else for a 3000-step fit. OTSR starts from a regular lattice and
+Good initial positions matter more than anything else for a 3000-step fit. OTSR starts from a regular mesh and
 moves it with an optimal-transport map to an edge-importance density, so that Gaussians concentrate where the image
-has detail while the lattice topology (no folds, no clumps) is preserved.
+has detail while the mesh topology (no folds, no clumps) is preserved.
 
-1. **Budget and lattice.** For a budget of K Gaussians, the lattice has gx = round(√(K W / H)) columns and
+1. **Budget and mesh.** For a budget of K Gaussians, the mesh has gx = round(√(K W / H)) columns and
    gy = round(K / gx) rows (N = gy gx ≈ K), spacing h = √(W H / N) pixels.
 2. **Density.** Luma Y = 0.299 R + 0.587 G + 0.114 B; g = |∂ₓY| + |∂ᵧY| by forward differences (zero on the last
    column / row). The target density is ρ = λ / (W H) + (1 − λ) g / Σg with the uniform share
-   λ = min(0.3, max(0.1, 0.3 − 0.2 (log₂ h − 2))) (0.3 for dense lattices, 0.1 for sparse ones), averaged onto a
+   λ = min(0.3, max(0.1, 0.3 − 0.2 (log₂ h − 2))) (0.3 for dense meshes, 0.1 for sparse ones), averaged onto a
    transport grid of n_long = min(256, max(128, round(L / 4))) cells along the long side (aspect kept, ≥ 8 cells).
 3. **Transport map.** Entropic OT from the uniform density to ρ on the box [0, W/L] × [0, H/L] with the quadratic
    cost, solved by log-domain Sinkhorn with ε-scaling: ε starts at the box size squared and shrinks by 0.6 per stage
    (6 iterations each) down to (1.5 cell)², where 30 final iterations run. The cost is separable, so each kernel
    application is two one-dimensional log-sum-exps. The map is the barycentric projection T(x) = E[y | x], an
    approximation of the Brenier map: the gradient of a convex potential, hence no shear and no folds.
-4. **Gaussians from cells.** Each lattice point is moved by T (bilinear interpolation of the displacement field,
+4. **Gaussians from cells.** Each mesh vertex is moved by T (bilinear interpolation of the displacement field,
    clamped to the image). The Jacobian J = ∂T/∂x (central differences on the grid, interpolated likewise) deforms
    the cell; the Gaussian takes the covariance (0.6 h / L)² J Jᵀ, i.e. σ = 0.6 × the local spacing along each
    principal axis (eigendecomposition → scales and angle; scales clamped to ≥ 0.35 px), the bilinearly sampled image

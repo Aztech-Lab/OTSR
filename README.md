@@ -23,13 +23,13 @@
 
 ---
 
-OTSR turns a raster image into a lattice of anisotropic 2-D Gaussians laid out by optimal transport, then renders that
+OTSR turns a raster image into a mesh of anisotropic 2-D Gaussians laid out by optimal transport, then renders that
 vector model at **any** resolution. Nothing leaves your machine: the initialisation, the gradient fit, the viewer and
 the export all run on your own GPU through [WebGPU](https://www.w3.org/TR/webgpu/). No server, no upload, no neural
 network weights. A 2048 × 2048 anime frame becomes 419 k Gaussians in about 6 s on an RTX 4090 and can then be viewed
 or exported at 2×, 4×, 8× … with edges as sharp as the original.
 
-The method is from our workshop paper on optimal-transport Gaussian lattices (see [CITATION.md](CITATION.md)); this
+The method is from our workshop paper on placing Gaussians by optimal transport (see [CITATION.md](CITATION.md)); this
 repository is its self-contained, browser-side implementation, by [Aztech Labs](https://github.com/Aztech-Lab).
 
 ## Try it
@@ -40,11 +40,11 @@ is much faster. Then:
 
 1. Press **Load sample**, or **Open image** / drop / paste an image of your own.
 2. Pick a preset (Fast / Standard / Best) and press **Enhance**. While it runs the stage plays the real process: the
-   optimal-transport lattice settling on the image through every Sinkhorn stage, the Gaussians growing in their id
+   optimal-transport mesh settling on the image through every Sinkhorn stage, the Gaussians growing in their id
    colours, a scan line revealing the result; the monitor on the right follows the three regions with the strongest
    gradients.
 3. Drag the divider to compare against bicubic, zoom with the wheel, pan by dragging; the **View** menu switches the
-   vector view, the OT lattice, the 1σ outlines and the error map.
+   vector view, the OT mesh, the 1σ outlines and the error map.
 4. **Export** as PNG, JPEG, WebP, AVIF or BMP at 1×–16× or any scale, or **Save .otsr** to keep the model (a few MB,
    re-renderable at any size later with **Load .otsr**).
 
@@ -63,7 +63,7 @@ Details in [docs/getting-started.md](docs/getting-started.md); if WebGPU does no
 ## How it works
 
 1. **Optimal-transport initialisation** — an edge-importance density of the image is computed, an entropic OT map
-   (Sinkhorn, on the GPU) moves a uniform lattice onto it, and every lattice cell, deformed by the map's Jacobian,
+   (Sinkhorn, on the GPU) moves a uniform mesh onto it, and every mesh cell, deformed by the map's Jacobian,
    becomes one Gaussian: dense and elongated along edges, sparse and round in flat regions.
 2. **Fitting** — Adam on all 9 parameters of every Gaussian (position, two log-scales, rotation, colour, log-weight)
    against the image, with the exact gradients of the weighted-normalised Gaussian blend; 3000 steps by default.
@@ -127,9 +127,9 @@ docs/                     documentation (method, engine, file format, testing, p
 
 | Version | What it brought |
 |---|---|
-| **0.1.4** | The **technical report**, rewritten as a magazine would tell it: the method of the paper in plain words, nine live demonstrations, the results in prose, a reading list of 45 entries. |
+| **0.1.4** | The **technical report**, rewritten as a magazine would tell it: the method of the paper in plain words, the pipeline run live under Figure A, nine live demonstrations, the results in prose, a reading list of 45 entries; one name, *mesh*, for the transported grid everywhere. |
 | **0.1.3** | **Phones**: a bottom-sheet layout with pinch zoom, a column layout sideways; the **technical report** page; the mode switch in the console's title bar and a console that keeps its width; less work per frame. |
-| **0.1.2** | The extras and the **vector view**: the model in Gaussian-id colours, the fit animation (OT lattice → Gaussians → scan reveal), the monitor panel, the View menu (vector / OT lattice / outlines / error map), export as PNG / JPEG / WebP / AVIF / BMP, a process log, notices in the status strip, bilingual labels, starlight and geometry on the stage, the way back to the start screen. |
+| **0.1.2** | The extras and the **vector view**: the model in Gaussian-id colours, the fit animation (OT mesh → Gaussians → scan reveal), the monitor panel, the View menu (vector / OT mesh / outlines / error map), export as PNG / JPEG / WebP / AVIF / BMP, a process log, notices in the status strip, bilingual labels, starlight and geometry on the stage, the way back to the start screen. |
 | **0.1.1** | **Research mode**: custom budget and steps, edge width, L1 / L2 loss, view modes and split against any resampler, 1σ outlines, error map, region tool, session info with the PSNR curve. |
 | **0.1.0** | First public version: the WebGPU engine and the UI in the lab-white / copper design, the `.otsr` format, the Python reference and the golden tests. |
 
