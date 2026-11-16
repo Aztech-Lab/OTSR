@@ -144,7 +144,7 @@ step-by-step record of how the research code was turned into this engine (deriva
 
 ## Acknowledgements
 
-OTSR is built and maintained by [Aztech Labs](https://github.com/Aztech-Lab); the sample image is our own work.
+OTSR is built and maintained by [Aztech Labs](https://github.com/Aztech-Lab); the sample image is our own work (AI genareted art).
 The WebGPU trainer of [SAD (Soft Anisotropic Diagrams)](https://github.com/luckyiyi/SAD) was a helpful reference for
 structuring a browser-side fitting loop; the GPU tests run on [Dawn's Node bindings](https://github.com/dawn-gpu/node-webgpu).
 
