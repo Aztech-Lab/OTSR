@@ -44,6 +44,7 @@ src/app/viewer.ts         WebGPU canvas + 2-D overlay: pan / zoom, split compari
 src/app/roi.ts            the shared region-of-interest model (drawing, editing, clamping)
 src/app/presets.ts        the quality tiers, the time / memory estimates and the largest image a device's buffers allow
 src/app/hardware.ts       the system check of the start screen (browser, GPU, limits, verdict) and the phone test
+tools/readme-figures.py   the README figures (docs/assets/*.svg, light and dark): run it again after a version bump
 src/app/tiermenu.ts       the tier menu of the split run button (phone layout)
 src/app/shortcuts.ts      keyboard shortcuts;  toast.ts: notifications;  dom.ts: h(), bilingual labels, formats;  image.ts: decoding, PNG, downloads
 src/tokens.css            design tokens and base elements, shared by the app (style.css) and the report (report.css)

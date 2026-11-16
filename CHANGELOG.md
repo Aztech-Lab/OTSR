@@ -79,6 +79,9 @@ The technical report:
 
 Found on the way:
 
+- The README redrawn: an animated hero and a pipeline figure in the OTSR design (light and dark, from
+  `tools/readme-figures.py`), the sample at 4× in the split view, badges in the palette, and the app described by
+  layout rather than by feature list.
 - The frosted panels were not frosted in current Chrome: the build kept only the `-webkit-` form of `backdrop-filter`,
   which Chrome no longer reads. The stylesheet now gives the standard property alone.
 - After every fit the monitor's snapshot loop finished its 600 ms wait before the fit could end — up to 0.6 s added to

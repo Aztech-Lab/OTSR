@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="t d">
+  <title id="t">OTSR — optimal-transport Gaussian super-resolution in the browser</title>
+  <desc id="d">The start screen of OTSR: the instrument with its rings waiting for an image, the wordmark, three claims (any resolution, on-device, no neural weights), the boot log reporting the GPU ready, and a strip of anisotropic Gaussians.</desc>
+  <style>
+  .sans { font-family: system-ui,-apple-system,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif; }
+  .mono { font-family: ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,'DejaVu Sans Mono',monospace; }
+  .spin { transform-origin: 300px 262px; animation: spin 90s linear infinite; }
+  .spinr { transform-origin: 300px 262px; animation: spin 140s linear infinite reverse; }
+  .blink { animation: blink 1.1s steps(1) infinite; }
+  .d1 { animation: dot 1.6s steps(1) infinite; }
+  .d2 { animation: dot 1.6s steps(1) .4s infinite; }
+  .d3 { animation: dot 1.6s steps(1) .8s infinite; }
+  .glow { animation: glow 2.6s ease-in-out infinite; }
+  .star { animation: star 4s ease-in-out infinite; }
+  .boot { animation: boot 11s steps(1) infinite; }
+  .seg { animation: seg 11s steps(1) infinite; }
+  .gauss { animation: grow 3.2s ease-in-out infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @keyframes dot { 0%, 24% { opacity: 0; } 25%, 100% { opacity: 1; } }
+  @keyframes glow { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+  @keyframes star { 0%, 100% { opacity: .25; } 50% { opacity: .75; } }
+  @keyframes grow { 0%, 100% { transform: scale(.55); opacity: .35; } 50% { transform: scale(1); opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  .b0 { animation-delay: 0s; } @keyframes boot0 { 0%, 6% { opacity: 0; } 6.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: 0; } }
+  .b0 { animation: boot0 11s linear infinite; }
+  .b1 { animation-delay: 0s; } @keyframes boot1 { 0%, 13% { opacity: 0; } 13.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: 0; } }
+  .b1 { animation: boot1 11s linear infinite; }
+  .b2 { animation-delay: 0s; } @keyframes boot2 { 0%, 20% { opacity: 0; } 20.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: 0; } }
+  .b2 { animation: boot2 11s linear infinite; }
+  .b3 { animation-delay: 0s; } @keyframes boot3 { 0%, 27% { opacity: 0; } 27.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: 0; } }
+  .b3 { animation: boot3 11s linear infinite; }
+  .b4 { animation-delay: 0s; } @keyframes boot4 { 0%, 34% { opacity: 0; } 34.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: 0; } }
+  .b4 { animation: boot4 11s linear infinite; }
+  @keyframes seg0 { 0%, 40% { opacity: .25; } 40.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s0 { animation: seg0 11s linear infinite; }
+  @keyframes seg1 { 0%, 44% { opacity: .25; } 44.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s1 { animation: seg1 11s linear infinite; }
+  @keyframes seg2 { 0%, 48% { opacity: .25; } 48.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s2 { animation: seg2 11s linear infinite; }
+  @keyframes seg3 { 0%, 52% { opacity: .25; } 52.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s3 { animation: seg3 11s linear infinite; }
+  @keyframes seg4 { 0%, 56% { opacity: .25; } 56.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s4 { animation: seg4 11s linear infinite; }
+  @keyframes seg5 { 0%, 60% { opacity: .25; } 60.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s5 { animation: seg5 11s linear infinite; }
+  @keyframes seg6 { 0%, 64% { opacity: .25; } 64.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s6 { animation: seg6 11s linear infinite; }
+  @keyframes seg7 { 0%, 68% { opacity: .25; } 68.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s7 { animation: seg7 11s linear infinite; }
+  @keyframes seg8 { 0%, 72% { opacity: .25; } 72.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s8 { animation: seg8 11s linear infinite; }
+  @keyframes seg9 { 0%, 76% { opacity: .25; } 76.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s9 { animation: seg9 11s linear infinite; }
+  @keyframes seg10 { 0%, 80% { opacity: .25; } 80.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s10 { animation: seg10 11s linear infinite; }
+  @keyframes seg11 { 0%, 84% { opacity: .25; } 84.01%, 94% { opacity: 1; } 94.01%, 100% { opacity: .25; } }
+  .s11 { animation: seg11 11s linear infinite; }
+  </style>
+  <defs>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="11" cy="11" r="1.1" fill="rgba(20,22,20,0.16)"/></pattern>
+    <pattern id="grid" width="110" height="110" patternUnits="userSpaceOnUse"><path d="M110 0 V110 M0 110 H110" stroke="#c7c8c0" stroke-width=".6" opacity=".5"/></pattern>
+    <filter id="blur" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="textglow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1280" height="520" fill="#ebebe8"/>
+  <rect width="1280" height="520" fill="url(#grid)"/>
+  <rect width="1280" height="520" fill="url(#dots)"/>
+  <circle cx="120" cy="90" r="18" fill="#d9a25f" filter="url(#blur)" class="star" style="animation-delay:0s"/><path d="M91 90 H149 M120 61 V119" stroke="#d9a25f" stroke-width=".8" opacity=".5" class="star" style="animation-delay:0s"/>
+<circle cx="470" cy="420" r="14" fill="#d9a25f" filter="url(#blur)" class="star" style="animation-delay:1.3s"/><path d="M448 420 H492 M470 398 V442" stroke="#d9a25f" stroke-width=".8" opacity=".5" class="star" style="animation-delay:1.3s"/>
+<circle cx="1130" cy="120" r="22" fill="#d9a25f" filter="url(#blur)" class="star" style="animation-delay:2.1s"/><path d="M1095 120 H1165 M1130 85 V155" stroke="#d9a25f" stroke-width=".8" opacity=".5" class="star" style="animation-delay:2.1s"/>
+<circle cx="1010" cy="440" r="16" fill="#d9a25f" filter="url(#blur)" class="star" style="animation-delay:0.7s"/><path d="M984 440 H1036 M1010 414 V466" stroke="#d9a25f" stroke-width=".8" opacity=".5" class="star" style="animation-delay:0.7s"/>
+<circle cx="720" cy="60" r="12" fill="#d9a25f" filter="url(#blur)" class="star" style="animation-delay:3.2s"/><path d="M701 60 H739 M720 41 V79" stroke="#d9a25f" stroke-width=".8" opacity=".5" class="star" style="animation-delay:3.2s"/>
+<circle cx="900" cy="480" r="10" fill="#d9a25f" filter="url(#blur)" class="star" style="animation-delay:1.9s"/><path d="M884 480 H916 M900 464 V496" stroke="#d9a25f" stroke-width=".8" opacity=".5" class="star" style="animation-delay:1.9s"/>
+  <!-- the instrument -->
+  <g fill="none" stroke="#b8793c">
+    <circle cx="300" cy="262" r="236" stroke-width="1" stroke-dasharray="3 9" opacity=".9" class="spin"/>
+    <circle cx="300" cy="262" r="196" stroke-width="2.5" stroke-dasharray="190 1050" stroke-linecap="round" class="spinr"/>
+    <circle cx="300" cy="262" r="150" stroke-width=".8" stroke-dasharray="1 6" opacity=".8" class="spin"/>
+    <circle cx="300" cy="262" r="104" stroke-width=".8" opacity=".5"/>
+    <path d="M300 26 v10 M300 498 v-10 M64 262 h10 M536 262 h-10" stroke-width="1.5"/>
+  </g>
+  <path d="M130 114 V92 H152" stroke="#b8793c" stroke-width="2" fill="none"/>
+<path d="M130 410 V432 H152" stroke="#b8793c" stroke-width="2" fill="none"/>
+<path d="M470 114 V92 H448" stroke="#b8793c" stroke-width="2" fill="none"/>
+<path d="M470 410 V432 H448" stroke="#b8793c" stroke-width="2" fill="none"/>
+  <!-- input detecting -->
+  <g class="glow" filter="url(#textglow)">
+    <rect x="224" y="156" width="7" height="7" fill="#b8793c" class="blink"/>
+    <text x="238" y="163" class="mono" font-size="11" letter-spacing="2.2" fill="#b8793c">INPUT DETECTING<tspan class="d1">.</tspan><tspan class="d2">.</tspan><tspan class="d3">.</tspan></text>
+  </g>
+  <text x="300" y="212" class="sans" font-size="34" font-weight="900" letter-spacing="5" text-anchor="middle" fill="#111312">DROP IMAGE</text>
+  <text x="300" y="238" class="sans" font-size="12" letter-spacing="5" text-anchor="middle" fill="#6f726a">拖入 · 貼上 · 選擇</text>
+  <!-- the three actions -->
+  <polygon points="170.0,262.0 300.0,262.0 300.0,306.0 178.0,306.0 170.0,298.0" fill="#ffffff"/>
+  <text x="186" y="281" class="mono" font-size="11" font-weight="700" letter-spacing="1.5" fill="#111312">LOAD SAMPLE</text>
+  <text x="186" y="296" class="sans" font-size="9" letter-spacing="1.5" fill="#111312" opacity=".75">載入樣本</text>
+  <text x="284" y="289" class="mono" font-size="13" fill="#111312">↓</text>
+  <polygon points="300.0,262.0 422.0,262.0 430.0,270.0 430.0,306.0 300.0,306.0" fill="#b8793c"/>
+  <text x="316" y="281" class="mono" font-size="11" font-weight="700" letter-spacing="1.5" fill="#ffffff">OPEN IMAGE</text>
+  <text x="316" y="296" class="sans" font-size="9" letter-spacing="1.5" fill="#ffffff" opacity=".8">開啟圖片</text>
+  <text x="411" y="289" class="mono" font-size="13" fill="#ffffff">→</text>
+  <polygon points="178.0,318.0 422.0,318.0 430.0,326.0 430.0,350.0 422.0,358.0 178.0,358.0 170.0,350.0 170.0,326.0" fill="rgba(246,246,243,0.55)" stroke="#24261f" stroke-width="1"/>
+  <text x="186" y="335" class="mono" font-size="11" font-weight="700" letter-spacing="1.5" fill="#111312">TECHNICAL REPORT</text>
+  <text x="186" y="349" class="sans" font-size="9" letter-spacing="1.5" fill="#6f726a">技術報告 · 原理與過程</text>
+  <text x="408" y="343" class="mono" font-size="13" fill="#111312">↗</text>
+  <text x="300" y="380" class="mono" font-size="9" letter-spacing="1.8" text-anchor="middle" fill="#6f726a" text-decoration="underline">SOURCE ON GITHUB · 原始碼 ↗</text>
+  <text x="70" y="52" class="mono" font-size="9" letter-spacing="1.2" fill="#6f726a">// ANY SIZE</text>
+  <text x="70" y="66" class="mono" font-size="9" letter-spacing="1.2" fill="#6f726a">// ANY ASPECT RATIO</text>
+  <text x="530" y="52" class="mono" font-size="9" letter-spacing="1.2" fill="#6f726a" text-anchor="end">ON-DEVICE</text>
+  <text x="530" y="66" class="mono" font-size="9" letter-spacing="1.2" fill="#6f726a" text-anchor="end">NOTHING UPLOADED</text>
+  <!-- the wordmark -->
+  <text x="596" y="150" class="sans" font-size="98" font-weight="900" letter-spacing="10" fill="#111312">OTSR</text>
+  <polygon points="902.0,92.0 984.0,92.0 990.0,98.0 990.0,122.0 908.0,122.0 902.0,116.0" fill="#b8793c"/>
+  <text x="946" y="112" class="mono" font-size="12" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#ffffff">V0.1.4</text>
+  <rect x="600" y="170" width="2" height="12" fill="#a3a59d"/><rect x="604" y="170" width="1" height="12" fill="#a3a59d"/><rect x="608" y="170" width="1" height="12" fill="#a3a59d"/><rect x="612" y="170" width="2" height="12" fill="#a3a59d"/><rect x="616" y="170" width="1" height="12" fill="#a3a59d"/><rect x="620" y="170" width="1" height="12" fill="#a3a59d"/><rect x="624" y="170" width="2" height="12" fill="#a3a59d"/><rect x="628" y="170" width="1" height="12" fill="#a3a59d"/><rect x="632" y="170" width="1" height="12" fill="#a3a59d"/><rect x="636" y="170" width="2" height="12" fill="#a3a59d"/><rect x="640" y="170" width="1" height="12" fill="#a3a59d"/><rect x="644" y="170" width="1" height="12" fill="#a3a59d"/><rect x="648" y="170" width="2" height="12" fill="#a3a59d"/><rect x="652" y="170" width="1" height="12" fill="#a3a59d"/><rect x="656" y="170" width="1" height="12" fill="#a3a59d"/><rect x="660" y="170" width="2" height="12" fill="#a3a59d"/><rect x="664" y="170" width="1" height="12" fill="#a3a59d"/><rect x="668" y="170" width="1" height="12" fill="#a3a59d"/><rect x="672" y="170" width="2" height="12" fill="#a3a59d"/><rect x="676" y="170" width="1" height="12" fill="#a3a59d"/>
+  <text x="690" y="181" class="mono" font-size="12" letter-spacing="3" fill="#24261f">OPTIMAL-TRANSPORT GAUSSIAN SUPER-RESOLUTION</text>
+  <polygon points="606.0,212.0 848.0,212.0 854.0,218.0 854.0,234.0 848.0,240.0 606.0,240.0 600.0,234.0 600.0,218.0" fill="none" stroke="#b8793c" stroke-width="1"/><text x="727" y="230" class="mono" font-size="9.5" font-weight="700" letter-spacing="1.2" text-anchor="middle" fill="#b8793c">ANY RESOLUTION · ANY ASPECT RATIO</text>
+<polygon points="874.0,212.0 1081.0,212.0 1087.0,218.0 1087.0,234.0 1081.0,240.0 874.0,240.0 868.0,234.0 868.0,218.0" fill="none" stroke="#b8793c" stroke-width="1"/><text x="978" y="230" class="mono" font-size="9.5" font-weight="700" letter-spacing="1.2" text-anchor="middle" fill="#b8793c">ON-DEVICE · NOTHING UPLOADED</text>
+<polygon points="1107.0,212.0 1238.0,212.0 1244.0,218.0 1244.0,234.0 1238.0,240.0 1107.0,240.0 1101.0,234.0 1101.0,218.0" fill="none" stroke="#b8793c" stroke-width="1"/><text x="1172" y="230" class="mono" font-size="9.5" font-weight="700" letter-spacing="1.2" text-anchor="middle" fill="#b8793c">NO NEURAL WEIGHTS</text>
+  <!-- the boot log -->
+  <text x="600" y="300" class="mono b0" font-size="11" letter-spacing="1" fill="#6f726a"><tspan fill="#b8793c">› </tspan>SYS.INIT // OTSR 0.1.4</text>
+<text x="600" y="319" class="mono b1" font-size="11" letter-spacing="1" fill="#6f726a"><tspan fill="#b8793c">› </tspan>WEBGPU ADAPTER // YOUR GPU</text>
+<text x="600" y="338" class="mono b2" font-size="11" letter-spacing="1" fill="#6f726a"><tspan fill="#b8793c">› </tspan>KERNELS // 16 PIPELINES COMPILED</text>
+<text x="600" y="357" class="mono b3" font-size="11" letter-spacing="1" fill="#6f726a"><tspan fill="#b8793c">› </tspan>SYSTEM CHECK // READY</text>
+<text x="600" y="376" class="mono b4" font-size="11" letter-spacing="1" fill="#24261f"><tspan fill="#b8793c">› </tspan>READY // DROP, PASTE OR OPEN AN IMAGE<tspan fill="#b8793c" class="blink"> ▌</tspan></text>
+  <!-- the image as Gaussians -->
+  <g transform="translate(620 428.0)"><g class="gauss" style="animation-delay:0.00s"><ellipse rx="20" ry="5" transform="rotate(-11)" fill="#b8793c"/></g></g>
+<g transform="translate(658 432.4)"><g class="gauss" style="animation-delay:0.23s"><ellipse rx="15" ry="7" transform="rotate(-10)" fill="#d9a25f"/></g></g>
+<g transform="translate(696 435.9)"><g class="gauss" style="animation-delay:0.46s"><ellipse rx="10" ry="5" transform="rotate(-7)" fill="#4f7a4a"/></g></g>
+<g transform="translate(734 437.8)"><g class="gauss" style="animation-delay:0.69s"><ellipse rx="20" ry="7" transform="rotate(-2)" fill="#6f726a"/></g></g>
+<g transform="translate(772 437.7)"><g class="gauss" style="animation-delay:0.92s"><ellipse rx="15" ry="5" transform="rotate(3)" fill="#24261f"/></g></g>
+<g transform="translate(810 435.6)"><g class="gauss" style="animation-delay:1.15s"><ellipse rx="10" ry="7" transform="rotate(7)" fill="#b8793c"/></g></g>
+<g transform="translate(848 432.0)"><g class="gauss" style="animation-delay:1.38s"><ellipse rx="20" ry="5" transform="rotate(10)" fill="#d9a25f"/></g></g>
+<g transform="translate(886 427.6)"><g class="gauss" style="animation-delay:1.61s"><ellipse rx="15" ry="7" transform="rotate(11)" fill="#4f7a4a"/></g></g>
+<g transform="translate(924 423.3)"><g class="gauss" style="animation-delay:1.84s"><ellipse rx="10" ry="5" transform="rotate(10)" fill="#6f726a"/></g></g>
+<g transform="translate(962 419.9)"><g class="gauss" style="animation-delay:2.07s"><ellipse rx="20" ry="7" transform="rotate(6)" fill="#24261f"/></g></g>
+<g transform="translate(1000 418.1)"><g class="gauss" style="animation-delay:2.30s"><ellipse rx="15" ry="5" transform="rotate(2)" fill="#b8793c"/></g></g>
+<g transform="translate(1038 418.4)"><g class="gauss" style="animation-delay:2.53s"><ellipse rx="10" ry="7" transform="rotate(-3)" fill="#d9a25f"/></g></g>
+<g transform="translate(1076 420.6)"><g class="gauss" style="animation-delay:2.76s"><ellipse rx="20" ry="5" transform="rotate(-7)" fill="#4f7a4a"/></g></g>
+<g transform="translate(1114 424.3)"><g class="gauss" style="animation-delay:2.99s"><ellipse rx="15" ry="7" transform="rotate(-10)" fill="#6f726a"/></g></g>
+  <text x="600" y="466" class="mono" font-size="9.5" letter-spacing="1.6" fill="#6f726a">THE IMAGE AS A MESH OF ANISOTROPIC GAUSSIANS · DENSE ALONG EDGES, SPARSE WHERE FLAT</text>
+  <!-- the status strip -->
+  <path d="M40 478 H1240" stroke="#c7c8c0" stroke-width="1"/>
+  <rect x="40" y="495" width="6" height="6" fill="#4f7a4a"/>
+  <text x="54" y="501" class="mono" font-size="10" letter-spacing="1.4" fill="#6f726a">IDLE</text>
+  <text x="140" y="501" class="mono" font-size="10" letter-spacing="1.4" fill="#6f726a">SYS.READY — awaiting input</text>
+  <rect x="1000" y="496" width="10" height="4" fill="#b8793c" class="s0"/>
+<rect x="1014" y="496" width="10" height="4" fill="#b8793c" class="s1"/>
+<rect x="1028" y="496" width="10" height="4" fill="#b8793c" class="s2"/>
+<rect x="1042" y="496" width="10" height="4" fill="#b8793c" class="s3"/>
+<rect x="1056" y="496" width="10" height="4" fill="#b8793c" class="s4"/>
+<rect x="1070" y="496" width="10" height="4" fill="#b8793c" class="s5"/>
+<rect x="1084" y="496" width="10" height="4" fill="#b8793c" class="s6"/>
+<rect x="1098" y="496" width="10" height="4" fill="#b8793c" class="s7"/>
+<rect x="1112" y="496" width="10" height="4" fill="#b8793c" class="s8"/>
+<rect x="1126" y="496" width="10" height="4" fill="#b8793c" class="s9"/>
+<rect x="1140" y="496" width="10" height="4" fill="#b8793c" class="s10"/>
+<rect x="1154" y="496" width="10" height="4" fill="#b8793c" class="s11"/>
+  <text x="1240" y="501" class="mono" font-size="10" letter-spacing="1.4" fill="#6f726a" text-anchor="end">GPU · YOURS</text>
+</svg>

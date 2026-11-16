@@ -1,27 +1,21 @@
-<h1 align="center">OTSR</h1>
+<div align="center">
 
-<p align="center"><b>Optimal-transport Gaussian upscaling, in your browser, on your GPU.</b></p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
+  <img alt="OTSR — optimal-transport Gaussian super-resolution in the browser. The start screen of the app: the instrument waiting for an image, the wordmark, three claims (any resolution, on-device, no neural weights) and the boot log reporting the GPU ready." src="docs/assets/hero-light.svg" width="100%">
+</picture>
 
-<p align="center">
-  <a href="https://aztech-lab.github.io/OTSR/"><b>▶&nbsp; Open OTSR — aztech-lab.github.io/OTSR</b></a>
-</p>
+<br>
 
-<p align="center">
-  <a href="https://aztech-lab.github.io/OTSR/">Live app</a> ·
-  <a href="https://aztech-lab.github.io/OTSR/report.html">Technical report</a> ·
-  <a href="docs/getting-started.md">Getting started</a> ·
-  <a href="docs/method.md">The method</a> ·
-  <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="CITATION.md">Cite</a>
-</p>
+[![Version 0.1.4](https://img.shields.io/badge/version-0.1.4-b8793c?style=flat-square)](CHANGELOG.md) [![License: MIT](https://img.shields.io/badge/license-MIT-24261f?style=flat-square)](LICENSE) [![Runs on WebGPU](https://img.shields.io/badge/runs%20on-WebGPU-4f7a4a?style=flat-square)](https://www.w3.org/TR/webgpu/) [![Live app](https://img.shields.io/github/deployments/Aztech-Lab/OTSR/github-pages?style=flat-square&label=live%20app&color=b8793c)](https://aztech-lab.github.io/OTSR/) [![Last commit](https://img.shields.io/github/last-commit/Aztech-Lab/OTSR?style=flat-square&color=6f726a)](https://github.com/Aztech-Lab/OTSR/commits/main)
 
-<p align="center">
-  <img alt="version 0.1.4" src="https://img.shields.io/badge/version-0.1.4-c47a3a">
-  <img alt="MIT" src="https://img.shields.io/badge/license-MIT-2b2b2b">
-  <img alt="WebGPU" src="https://img.shields.io/badge/runs%20on-WebGPU-2b2b2b">
-</p>
+### [▶&nbsp; Open OTSR — aztech-lab.github.io/OTSR](https://aztech-lab.github.io/OTSR/)
 
----
+**[Technical report](https://aztech-lab.github.io/OTSR/report.html)** · **[Getting started](docs/getting-started.md)** · **[The method](docs/method.md)** · **[Changelog](CHANGELOG.md)** · **[Cite](CITATION.md)**
+
+</div>
+
+## What it is
 
 OTSR turns a raster image into a mesh of anisotropic 2-D Gaussians laid out by optimal transport, then renders that
 vector model at **any** resolution. Nothing leaves your machine: the initialisation, the gradient fit, the viewer and
@@ -32,36 +26,12 @@ or exported at 2×, 4×, 8× … with edges as sharp as the original.
 The method is from our workshop paper on placing Gaussians by optimal transport (see [CITATION.md](CITATION.md)); this
 repository is its self-contained, browser-side implementation, by [Aztech Labs](https://github.com/Aztech-Lab).
 
-## Try it
-
-**[aztech-lab.github.io/OTSR](https://aztech-lab.github.io/OTSR/)** — open it in Chrome or Edge 113+ (Windows, macOS,
-Linux, Android) or Safari 26+ (macOS, iOS), on a machine with a GPU. Integrated GPUs and phones work; a discrete GPU
-is much faster. Then:
-
-1. Press **Load sample**, or **Open image** / drop / paste an image of your own.
-2. Pick a tier (Turbo / Fast / Standard / Best) and press **Enhance**. While it runs the stage plays the real
-   process: the optimal-transport mesh settling on the image through every Sinkhorn stage, the Gaussians growing in
-   their id colours, a scan line revealing the result; the monitor on the right follows the three regions with the
-   strongest gradients. Turbo skips the show and is done in a fraction of a second on a desktop GPU.
-3. Drag the divider to compare against bicubic, zoom with the wheel, pan by dragging; the **View** menu switches the
-   vector view, the OT mesh, the 1σ outlines and the error map.
-4. **Export** as PNG, JPEG, WebP, AVIF or BMP at 1×–16× or any scale, or **Save .otsr** to keep the model (a few MB,
-   re-renderable at any size later with **Load .otsr**).
-
-The start screen first checks the device: whether WebGPU works here, the GPU and its limits, and the largest image
-one fit can take. On a phone the tier sits in the menu of the Enhance button (phones start on Fast), the console is a
-sheet at the bottom (tap its title bar to open or fold it), two fingers zoom, and the rest is the same. The **[technical report](https://aztech-lab.github.io/OTSR/report.html)** tells the method of the paper behind
-the app the way a magazine would, with nine live demonstrations, what the app does, how the engine works, and a
-reading list.
-
-**Research** mode opens every parameter (Gaussians per pixel, steps, edge width, L1 / L2 loss), the split comparison
-against any resampler, the region tool and the session information with the PSNR curve. Everything has a keyboard
-shortcut (press **?**) and every label is in English and Traditional Chinese.
-
-Details in [docs/getting-started.md](docs/getting-started.md); if WebGPU does not start, see
-[docs/troubleshooting.md](docs/troubleshooting.md) (dual-GPU laptops in particular).
-
 ## How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pipeline-dark.svg">
+  <img alt="Four stages: an image with an edge; a uniform mesh that optimal transport packs along the edge; one anisotropic Gaussian per mesh cell; the result at 8× next to bicubic, with a crisp edge." src="docs/assets/pipeline-light.svg" width="100%">
+</picture>
 
 1. **Optimal-transport initialisation** — an edge-importance density of the image is computed, an entropic OT map
    (Sinkhorn, on the GPU) moves a uniform mesh onto it, and every mesh cell, deformed by the map's Jacobian,
@@ -74,19 +44,86 @@ Details in [docs/getting-started.md](docs/getting-started.md); if WebGPU does no
    sharp (Green, SIGGRAPH 2007): a locally normalised luminance field is re-thresholded with a transition a fixed
    number of *output* pixels wide, so edges stay crisp at 8× while gradients and shading are untouched.
 
-The full derivation is in [docs/method.md](docs/method.md) and the engine in [docs/engine.md](docs/engine.md).
+The full derivation is in [docs/method.md](docs/method.md), the engine in [docs/engine.md](docs/engine.md), and the
+**[technical report](https://aztech-lab.github.io/OTSR/report.html)** tells the whole story the way a magazine would,
+with nine demonstrations that run live in the page.
 
-## Performance
+## What it looks like
 
-RTX 4090 (Windows, D3D12), default settings, 2048 × 2048 image, 0.1 Gaussians per pixel:
+<img alt="The sample image at 4× in the app's split view: bicubic on the left, OTSR with the edge pass on the right. Lines and hair strands are crisp on the right, soft on the left." src="docs/assets/compare-4x.jpg" width="100%">
 
-| Stage | Time |
-|---|---|
-| OT initialisation | 0.5 s |
-| Fit, 3000 steps (565 steps/s, 52.7 dB) | 5.3 s |
-| 4× export, 8192 × 8192 with edges | 1.3 s |
+<sub>The bundled sample at 4×, as the app's split view shows it: bicubic on the left, OTSR with the edge pass on the
+right. Standard tier, 83.6 k Gaussians, 48.6 dB against the source.</sub>
 
-The memory model and more measurements are in [docs/performance.md](docs/performance.md).
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**On a computer**
+
+The console on the left holds the source, the tier and the output scale; Enhance sits at the top. While a fit runs
+the stage plays the real process: the OT mesh settling on the image through every Sinkhorn stage, the Gaussians
+growing in their id colours, a scan line revealing the result, and a monitor following the three regions with the
+strongest gradients. Then drag the divider against bicubic, zoom with the wheel, export at any scale.
+
+</td>
+<td width="50%" valign="top">
+
+**On a phone**
+
+The same engine. The tier lives in the menu of the Enhance button (phones start on Fast; Turbo is about 4× quicker
+and skips the show), a strip under it shows the source, its cost and the state, and the console is a sheet at the
+bottom. Two fingers zoom. The start screen first checks the device: whether WebGPU works, the GPU and its limits,
+the largest image one fit can take.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Research mode**
+
+Every parameter (Gaussians per pixel, steps, edge width, L1 / L2 loss), the vector view with every Gaussian in its
+own colour, the OT mesh, the 1σ outlines, the error map, the split against any resampler, the region tool and the
+session information with the PSNR curve. Everything has a keyboard shortcut (press **?**) and every label is in
+English and Traditional Chinese.
+
+</td>
+<td width="50%" valign="top">
+
+**Files**
+
+Export as PNG, JPEG, WebP, AVIF or BMP at 1×–16× or any scale. **Save .otsr** keeps the model itself, a few MB that
+re-render at any size later with **Load .otsr**; the [format](docs/file-format.md) is documented and the Python
+reference reads it too.
+
+</td>
+</tr>
+</table>
+
+## Try it
+
+**[aztech-lab.github.io/OTSR](https://aztech-lab.github.io/OTSR/)** — open it in Chrome or Edge 113+ (Windows, macOS,
+Linux, Android) or Safari 26+ (macOS, iOS), on a machine with a GPU. Integrated GPUs and phones work; a discrete GPU
+is much faster. Then:
+
+1. Press **Load sample**, or **Open image** / drop / paste an image of your own.
+2. Pick a tier and press **Enhance**.
+3. Compare, zoom, pan; the **View** menu switches the vector view, the OT mesh, the outlines and the error map.
+4. **Export** at the scale you need, or **Save .otsr** to keep the model.
+
+The four tiers on an RTX 4090 (the fit alone; the OT initialisation adds 0.1–0.5 s):
+
+| Tier | Budget, steps | Sample, 1024 × 815 | Anime frame, 2048 × 2048 |
+|---|---|---|---|
+| Turbo | 1 Gaussian / 20 px, 400 | 0.11 s, 40.5 dB | 0.53 s, 49.0 dB |
+| Fast | 1 / 20 px, 1500 | 0.53 s, 43.4 dB | 2.17 s, 50.1 dB |
+| Standard | 1 / 10 px, 3000 | 0.99 s, 48.6 dB | 5.33 s, 52.8 dB |
+| Best | 1 / 7 px, 4000 | 1.68 s, 51.2 dB | 8.76 s, 54.5 dB |
+
+A 4× export of the 2048 × 2048 frame (8192 × 8192, with edges) takes 1.3 s. The memory model and more measurements
+are in [docs/performance.md](docs/performance.md); details of the app in [docs/getting-started.md](docs/getting-started.md);
+if WebGPU does not start, see [docs/troubleshooting.md](docs/troubleshooting.md) (dual-GPU laptops in particular).
 
 ## Run it yourself
 
@@ -119,7 +156,7 @@ src/core/                 CPU-side model code: constants, OT initialisation math
 reference/otsr_ref/       Python reference implementation (PyTorch, dense, float64-capable)
 reference/upstream/       unmodified snapshot of the research code the reference was derived from
 tests/unit, tests/gpu     Vitest suites; tests/golden holds the reference outputs they check against
-tools/                    serve, smoke test, benchmark, WebGPU probes
+tools/                    serve, smoke test, benchmark, WebGPU probes, the README figures
 public/samples/           the bundled sample image
 docs/                     documentation (method, engine, file format, testing, performance, troubleshooting)
 ```
@@ -142,9 +179,15 @@ Details per version are in [CHANGELOG.md](CHANGELOG.md).
 development, performance, troubleshooting — and [docs/tutorial-porting.md](docs/tutorial-porting.md), the
 step-by-step record of how the research code was turned into this engine (derivations, decisions, pitfalls).
 
+## Also from Aztech Labs
+
+The OTSR design — lab white or near-black, a copper signal, cut corners, monospaced labels — is also a skin of
+[CloudCLI-MobileUI](https://github.com/Aztech-Lab/CloudCLI-MobileUI), our phone-friendly web interface for Claude
+Code. The figures in this README are drawn in the same design (`tools/readme-figures.py`).
+
 ## Acknowledgements
 
-OTSR is built and maintained by [Aztech Labs](https://github.com/Aztech-Lab); the sample image is our own work (AI genareted art).
+OTSR is built and maintained by [Aztech Labs](https://github.com/Aztech-Lab); the sample image is our own work (AI-generated art).
 The WebGPU trainer of [SAD (Soft Anisotropic Diagrams)](https://github.com/luckyiyi/SAD) was a helpful reference for
 structuring a browser-side fitting loop; the GPU tests run on [Dawn's Node bindings](https://github.com/dawn-gpu/node-webgpu).
 
