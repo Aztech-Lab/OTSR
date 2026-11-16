@@ -29,8 +29,8 @@ repository is its self-contained, browser-side implementation, by [Aztech Labs](
 ## How it works
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pipeline-dark.svg">
-  <img alt="Four stages: an image with an edge; a uniform mesh that optimal transport packs along the edge; one anisotropic Gaussian per mesh cell; the result at 8× next to bicubic, with a crisp edge." src="docs/assets/pipeline-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pipeline-dark.svg?v=2">
+  <img alt="Four stages: an image with an edge; a uniform mesh that optimal transport packs along the edge; one anisotropic Gaussian per mesh cell; the result at 8× next to bicubic, with a crisp edge." src="docs/assets/pipeline-light.svg?v=2" width="100%">
 </picture>
 
 1. **Optimal-transport initialisation** — an edge-importance density of the image is computed, an entropic OT map
@@ -50,10 +50,11 @@ with nine demonstrations that run live in the page.
 
 ## What it looks like
 
-<img alt="The sample image at 4× in the app's split view: bicubic on the left, OTSR with the edge pass on the right. Lines and hair strands are crisp on the right, soft on the left." src="docs/assets/compare-4x.jpg" width="100%">
+<img alt="The visor of the sample image at 4× in the app's split view: bicubic on the left, OTSR with the edge pass on the right. The lines of the visor and the hair strands are crisp on the right, soft on the left." src="docs/assets/compare-4x.jpg?v=2" width="100%">
 
-<sub>The bundled sample at 4×, as the app's split view shows it: bicubic on the left, OTSR with the edge pass on the
-right. Standard tier, 83.6 k Gaussians, 48.6 dB against the source.</sub>
+<sub>The visor of the bundled sample at 4× (a 496 × 187 region of the source), as the app's split view shows it:
+bicubic on the left, OTSR with the edge pass on the right. Standard tier, 83.6 k Gaussians, 48.6 dB against the
+source.</sub>
 
 <table>
 <tr>
