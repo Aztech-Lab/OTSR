@@ -99,7 +99,14 @@ body.empty .brand .chip { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .instrument .center { position: relative; text-align: center; pointer-events: auto; }
 .instrument .center .micro { color: var(--copper); }
-.instrument h2 { margin: 10px 0 4px; font-size: 30px; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
+/* "Input detecting…": the square blinks, the dots type themselves, and the line glows softly over the rings */
+.instrument .center .detecting { text-shadow: 0 0 14px color-mix(in srgb, var(--copper) 65%, transparent), 0 1px 1px color-mix(in srgb, var(--bg) 90%, transparent); animation: detectGlow 2.6s ease-in-out infinite; }
+.instrument .center .detecting .dots::after { content: ''; display: inline-block; width: 1.4em; text-align: left; animation: dots 1.6s steps(1, end) infinite; }
+@keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+@keyframes detectGlow { 50% { text-shadow: 0 0 4px color-mix(in srgb, var(--copper) 30%, transparent), 0 1px 1px color-mix(in srgb, var(--bg) 90%, transparent); } }
+body.no-motion .instrument .center .detecting { animation: none; }
+body.no-motion .instrument .center .detecting .dots::after { animation: none; content: '...'; }
+.instrument h2 { margin: 10px 0 4px; font-size: 30px; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; text-shadow: 0 2px 16px color-mix(in srgb, var(--bg) 80%, transparent); }
 .instrument .zh { font-size: 13px; color: var(--muted); letter-spacing: 0.3em; }
 /* the three start actions share one column: the pair on top, the report entry under it at the same width */
 .homeacts { display: inline-grid; width: max-content; max-width: calc(100vw - 24px); grid-template-columns: 100%; margin-top: 22px; }
@@ -123,6 +130,10 @@ body.empty .brand .chip { display: none; }
   background: color-mix(in srgb, var(--panel-solid) 42%, transparent); backdrop-filter: blur(12px) saturate(1.4); }
 .instrument .report:hover { color: var(--copper); border-color: var(--copper); background: var(--copper-soft); }
 .instrument .report .arrow { font-size: 16px; }
+/* the source link under the report entry */
+.homeacts .repo { justify-self: center; margin-top: 12px; font: 500 10px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); text-decoration-color: color-mix(in srgb, var(--copper) 60%, transparent); }
+.homeacts .repo:hover { color: var(--copper); }
+.homeacts .repo .arrow { font-size: 11px; }
 .corner-note { position: absolute; font: 500 10px/1.6 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 .corner-note.tl { left: 6px; top: 6px; }
 .corner-note.tr { right: 6px; top: 6px; text-align: right; }
@@ -131,7 +142,30 @@ body.empty .brand .chip { display: none; }
 .bootlog { left: 40px; bottom: 112px; font: 500 10px/1.9 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); user-select: none; }
 .bootlog div::before { content: '› '; color: var(--copper); }
 .bootlog div:last-child { color: var(--text); }
-body.entering .instrument .open, body.entering .instrument .samplesel, body.entering .instrument .report { visibility: hidden; }
+/* the system check, as rows under its log line (phones get the card instead); kept clear of the instrument's left edge */
+.bootlog { max-width: clamp(280px, calc(50vw - 330px), 420px); }
+.bootlog .bootcheck { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 0 10px; margin: 1px 0 1px 15px; }
+.bootlog .bootcheck dt { color: var(--faint); }
+.bootlog .bootcheck dd { margin: 0; color: var(--muted); text-transform: none; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.bootlog .bootcheck dd.ok { color: var(--ok); }
+.bootlog .bootcheck dd.err { color: var(--danger); }
+/* computers: the system check lives in the boot log, the start screen's own Open button makes the top one redundant,
+   and the instrument's corner notes go when the window is too small to keep them clear of the wordmark and the log */
+@media (min-width: 961px) {
+  .syscheck { display: none !important; }
+  body.empty #nav-open { display: none; }
+}
+@media (min-width: 961px) and (max-width: 1299px) { .corner-note { display: none; } }
+@media (min-width: 961px) and (max-height: 799px) { .corner-note { display: none; } }
+/* narrow desktop windows: the system buttons shrink to their glyphs so the Enhance block keeps its room */
+@media (min-width: 961px) and (max-width: 1240px) {
+  .navbtn .bi, .themebtn .two, .navbtn .key { display: none; }
+  #help-btn .key { display: inline-flex; }
+  .navbtn .glyph { display: inline; }
+  .navbtn, .themebtn { padding: 0 11px; }
+  .sysnav { gap: 12px; }
+}
+body.entering .instrument .open, body.entering .instrument .samplesel, body.entering .instrument .report, body.entering .instrument .repo { visibility: hidden; }
 body:not(.empty):not(.entering) .instrument, body:not(.empty) .bootlog, body.empty .console, body.empty .bookmark, body.empty .paneltab, body.empty .monitor, body.empty .zoombar, body.empty .command, body:not(.has-fit) .result-hud { display: none; }
 
 /* ---- system check (start screen, bottom right): the verdict, then the facts behind it -------------------------------- */

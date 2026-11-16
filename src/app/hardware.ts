@@ -149,6 +149,34 @@ const mp = (px: number) => `${px >= 1e7 ? (px / 1e6).toFixed(0) : (px / 1e6).toF
 const gb = (n: number) => `${n >= 8 ? '≥ ' : '≈ '}${n} GB`;
 
 /** The card on the start screen: the verdict first, then the rows that back it. */
+/** The system check as short rows for the boot log of the start screen on computers: [key, value, tone?]. */
+export function syscheckRows(r: HardwareReport, prefs: Prefs, sample: { W: number; H: number } | null): [string, string, string?][] {
+  const fastMax = maxFitPixels(PRESETS.fast.kPerPx, r.maxBinding, r.maxBuffer);
+  const stdMax = maxFitPixels(PRESETS.standard.kPerPx, r.maxBinding, r.maxBuffer);
+  const level = r.fallback ? 'bad' : stdMax < 2e6 ? 'warn' : 'ok';
+  const memory = r.vram ? `${fmtBytes(r.vram)} (driver heaps)` : r.unified ? 'shared with the system' : 'not reported';
+  const tier = prefs.preset === 'custom' ? null : prefs.preset;
+  let speed = 'measured on the first fit';
+  if (!r.fallback && sample && tier && prefs.throughput > 0) {
+    const p = PRESETS[tier];
+    const est = fitSecondsEstimate(prefs, gaussianCount(p.kPerPx, sample.W, sample.H), p.steps);
+    speed = `${(prefs.throughput / 1e6).toFixed(0)} M Gaussian-steps/s` + (est !== null ? ` · sample ${fmtSeconds(est)} at ${p.label}` : '');
+  }
+  const fit = r.fallback ? 'minutes per fit on the CPU — turn on hardware acceleration'
+    : stdMax >= MAX_PIXELS ? `images up to ${mp(MAX_PIXELS)}` : `up to ${mp(fastMax)} at Fast, ${mp(stdMax)} at Standard`;
+  return [
+    ['Verdict', r.fallback ? 'Slow · software adapter, no GPU acceleration' : level === 'warn' ? 'Limited · WebGPU works, small buffers' : 'Ready · WebGPU works on this GPU', level === 'ok' ? 'ok' : 'err'],
+    ['GPU', r.gpu + (r.fallback ? ' · software' : '')],
+    ['Browser', [r.browser, r.os].filter(Boolean).join(' · ')],
+    ['Memory', memory + (r.ram ? ` · RAM ${gb(r.ram)}` : '')],
+    ['Buffers', `${fmtBytes(r.maxBuffer)} max · ${fmtBytes(r.maxBinding)} per binding`],
+    ['Features', r.features.length ? r.features.join(' · ') : 'core WebGPU'],
+    ['Device', `${r.threads || '?'} CPU threads · ${r.screen}`],
+    ['Fit', fit],
+    ['Speed', r.fallback ? 'not measured' : speed],
+  ];
+}
+
 export function renderSyscheck(host: HTMLElement, r: HardwareReport, prefs: Prefs, sample: { W: number; H: number } | null): void {
   const fastMax = maxFitPixels(PRESETS.fast.kPerPx, r.maxBinding, r.maxBuffer);
   const stdMax = maxFitPixels(PRESETS.standard.kPerPx, r.maxBinding, r.maxBuffer);

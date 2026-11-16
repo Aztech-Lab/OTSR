@@ -115,13 +115,14 @@ starlight holds still while a fit runs.
 
 ## The system check
 
-The start screen shows what the page found on this machine. First the verdict — *Ready*, *Limited* (WebGPU works,
-but the GPU allows only small buffers) or *Slow* (a software adapter) — and what it means: the largest image one fit
-can take at Fast and at Standard and, once a fit has run here, the measured speed and the time the sample takes. Then
-the facts: the browser and system, the GPU (its model, vendor and architecture), its memory, the buffer limits, the
-optional features, the CPU threads and the screen. Browsers do not tell a page how much memory the GPU has; the card
-says so and shows the system memory instead (phones, Apple and Intel integrated GPUs share it with the GPU), and the
-driver's memory heaps where Chrome's WebGPU developer flag is on. Nothing of this leaves the page.
+The start screen shows what the page found on this machine: on a computer as rows of the boot log at the bottom
+left, on a phone as a card under the instrument. First the verdict — *Ready*, *Limited* (WebGPU works, but the GPU
+allows only small buffers) or *Slow* (a software adapter) — and what it means: the largest image one fit can take at
+Fast and at Standard and, once a fit has run here, the measured speed and the time the sample takes. Then the facts:
+the browser and system, the GPU (its model, vendor and architecture), its memory, the buffer limits, the optional
+features, the CPU threads and the screen. Browsers do not tell a page how much memory the GPU has; the check says so
+and shows the system memory instead (phones, Apple and Intel integrated GPUs share it with the GPU), and the driver's
+memory heaps where Chrome's WebGPU developer flag is on. Nothing of this leaves the page.
 
 The **technical report** (`report.html`, from the start screen, the chip next to the version badge or the settings)
 tells the method behind the app in plain words, with nine live demonstrations, what the app does and how the

@@ -20,14 +20,13 @@ In the app:
   readouts in the style of the console's Source boxes: the source (name and size), its Gaussians, the GPU memory and
   the state (Idle, or Fitted with the PSNR). The sheet therefore opens on the output — scale, *Crisp edges*, export,
   save / load. *Crisp edges* (and the edge width of research mode) now belong to Output on every layout.
-- **A system check on the start screen** (硬體檢測; bottom right on computers, under the instrument on phones, beside
-  it when held sideways): whether WebGPU works here (*Ready*, *Limited*, *Slow*) and what that means — the largest
+- **A system check on the start screen** (硬體檢測; rows of the boot log at the bottom left on computers, a card
+  under the instrument on phones, beside it when held sideways): whether WebGPU works here (*Ready*, *Limited*, *Slow*) and what that means — the largest
   image one fit can take at Fast and at Standard, and, once a fit has run, the measured speed and the time the
   sample takes — then the facts behind it: the browser and system, the GPU (model, vendor, architecture), its memory,
   the buffer limits, the optional features, the CPU threads and the screen. Browsers do not report the size of the GPU
   memory; the card says so and shows the system memory (which phones, Apple and Intel integrated GPUs share with the
-  GPU), and the driver's memory heaps where Chrome's WebGPU developer flag exposes them. The boot log adds a SYSTEM
-  CHECK line. When WebGPU does not start at all, the notice lists the browser, whether the page is secure, whether the
+  GPU), and the driver's memory heaps where Chrome's WebGPU developer flag exposes them. When WebGPU does not start at all, the notice lists the browser, whether the page is secure, whether the
   API exists, what the adapter request answered and the GPU that WebGL sees.
 - **The state of the work moved to the status strip** (■ Idle / Running / Fitted at the bottom left; in the strip
   under the action on phones), and the mode switch took its place at the right of the console's title bar, framed and
@@ -38,7 +37,11 @@ In the app:
 - **A lighter phone console**: Output and Export only (the model file buttons and the process log stay on computers),
   so the image takes most of the screen; the sheet rises in when it opens, also by itself after a fit. The start
   screen keeps all its motion on phones, and the settings no longer scroll sideways on narrow screens.
-  The three start actions are larger, and the report entry spans the width of the pair above it, on frosted glass.
+  The three start actions are larger, and the report entry spans the width of the pair above it, on frosted glass,
+  with a link to the source under it. The line over the title reads *Input detecting…*, blinking and typing its dots,
+  with a soft glow. On computers the Enhance block now fits between the wordmark and the system buttons at every
+  window width (under 1240 px those buttons shrink to their glyphs), the top Open button stays out of the start
+  screen (the start screen has its own), and a short window moves the corner notes under the wordmark.
 - **The fit animation no longer slows the fit.** Its mesh was stroked two canvas pixels wide on high-density screens,
   a slow path of the 2-D canvas, and redrawn at the display rate: in headless Chrome the fit ran at about a third of
   its speed while the mesh was on screen. The mesh is now drawn with hairlines and one fill per brightness level

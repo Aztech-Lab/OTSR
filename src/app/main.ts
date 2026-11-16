@@ -7,7 +7,7 @@ import { Actions } from './actions';
 import { Stars } from './stars';
 import { bi, fmtBytes, fmtCount, fmtInt, fmtSeconds, h, setText, sparkline } from './dom';
 import { FitShow } from './fitshow';
-import { hardwareReport, isPhone, noGpuDiagnosis, renderSyscheck, type HardwareReport } from './hardware';
+import { hardwareReport, isPhone, noGpuDiagnosis, renderSyscheck, syscheckRows, type HardwareReport } from './hardware';
 import { JobRunner } from './jobs';
 import { Monitor } from './monitor';
 import { Panel } from './panel';
@@ -77,15 +77,15 @@ function radioTabs<T extends string>(host: HTMLElement, name: string, options: [
   return sync;
 }
 
-/** Boot log lines in the empty state, at least 140 ms apart so the start-up sequence is readable. */
-function bootLog(): (line: string) => void {
+/** Boot log lines (or a block) in the empty state, at least 140 ms apart so the start-up sequence is readable. */
+function bootLog(): (line: string | HTMLElement) => void {
   const host = $('boot');
   let last = 0;
   let queue = Promise.resolve();
-  return (line: string) => {
+  return (line: string | HTMLElement) => {
     queue = queue.then(() => new Promise<void>((resolve) => {
       const wait = Math.max(0, last + 140 - performance.now());
-      setTimeout(() => { host.append(h('div', null, line)); last = performance.now(); resolve(); }, wait);
+      setTimeout(() => { host.append(typeof line === 'string' ? h('div', null, line) : line); last = performance.now(); resolve(); }, wait);
     }));
   };
 }
@@ -121,7 +121,7 @@ async function boot(): Promise<void> {
     void document.body.offsetWidth; // restart the animations
     document.body.classList.add('entering');
     clearTimeout(enterTimer);
-    enterTimer = window.setTimeout(() => document.body.classList.remove('entering'), 1600);
+    enterTimer = window.setTimeout(() => { document.body.classList.remove('entering'); setInsets(); }, 1600);
   };
   store.subscribe((s, changed) => {
     if (changed.has('status')) {
@@ -162,10 +162,17 @@ async function boot(): Promise<void> {
     void noGpuDiagnosis(msg).then((rows) => $('nogpu-diag').replaceChildren(...rows.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])));
   };
   // the system check on the start screen: what this machine offers and what OTSR can do with it (hardware.ts)
+  // phones get the card; computers the same facts as rows of the boot log at the bottom left (both are kept up to
+  // date, the stylesheet shows one of them)
   const syscheck = $('syscheck');
+  const bootCheck = h('dl', { class: 'bootcheck' });
   let report: HardwareReport | null = null;
   let sampleSize: { W: number; H: number } | null = null;
-  const showSyscheck = () => { if (report) renderSyscheck(syscheck, report, store.state.prefs, sampleSize); };
+  const showSyscheck = () => {
+    if (!report) return;
+    renderSyscheck(syscheck, report, store.state.prefs, sampleSize);
+    bootCheck.replaceChildren(...syscheckRows(report, store.state.prefs, sampleSize).flatMap(([k, v, tone]) => [h('dt', null, k), h('dd', { class: tone ?? '', title: v }, v)]));
+  };
   if (!('gpu' in navigator)) return fail('WebGPU is not available in this browser.');
   let ctx: GpuContext;
   let pipes: Pipelines;
@@ -197,6 +204,8 @@ async function boot(): Promise<void> {
   const inspector = $('inspector');
   const monitorEl = $('monitor');
   const command = $('command');
+  const brand = $('brand');
+  const sysnav = document.querySelector<HTMLElement>('.sysnav')!;
   // keep the fitted image clear of the console (left), the monitor (right), the command block (top) and the bottom
   // bars, measured from the elements themselves; on the compact layout the sheet's height also docks the zoom bar
   const setInsets = () => {
@@ -217,12 +226,20 @@ async function boot(): Promise<void> {
         viewer.setInsets({ left: 4, top: top - 4, right: 4, bottom: sheetH + 52 });
       }
       zoombar.style.left = '';
+      command.style.left = '';
+      command.style.width = '';
       return;
     }
     const left = open ? box(inspector).right + 40 : 64;
     const right = store.state.monitor ? vw - box(monitorEl).left + 24 : 48;
     viewer.setInsets({ left, top: 124, right, bottom: 230 });
     zoombar.style.left = `${(left + (vw - right)) / 2}px`;
+    // the Enhance block: centred when there is room, otherwise squeezed between the wordmark and the system buttons
+    const spanL = box(brand).right + 20;
+    const spanR = box(sysnav).left - 20;
+    const w = Math.max(260, Math.min(320, spanR - spanL));
+    command.style.width = `${w}px`;
+    command.style.left = `${Math.min(Math.max(vw / 2, spanL + w / 2), spanR - w / 2)}px`;
   };
   setInsets();
   window.addEventListener('resize', setInsets);
@@ -565,7 +582,8 @@ async function boot(): Promise<void> {
   if (report) {
     $('corner-gpu').textContent = `GPU: ${report.gpu}`;
     showSyscheck();
-    log(`SYSTEM CHECK // ${{ ok: 'READY', warn: 'LIMITED', bad: 'SLOW' }[syscheck.dataset.level ?? 'ok'] ?? 'READY'} · ${report.gpu.toUpperCase()}`);
+    log(`SYSTEM CHECK // ${{ ok: 'READY', warn: 'LIMITED', bad: 'SLOW' }[syscheck.dataset.level ?? 'ok'] ?? 'READY'}`);
+    log(bootCheck);
   }
   log('READY // DROP, PASTE OR OPEN AN IMAGE');
   (window as unknown as { otsr: unknown }).otsr = api(store, actions, viewer, ctx, pipes, show);
