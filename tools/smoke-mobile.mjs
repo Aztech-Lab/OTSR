@@ -53,6 +53,7 @@ const layoutProblems = () => {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
       if (el.closest('[hidden]')) continue;
+      if (el.closest('#empty') && !el.closest('#empty .center')) continue; // the instrument's rings run off the sides of a phone by design
       let scroller = false;
       for (let a = el.parentElement; a && a !== root.parentElement; a = a.parentElement) { const o = getComputedStyle(a).overflowY; if (o === 'auto' || o === 'scroll') { scroller = true; break; } }
       if (scroller) continue;

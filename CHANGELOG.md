@@ -37,8 +37,9 @@ In the app:
 - **A lighter phone console**: Output and Export only (the model file buttons and the process log stay on computers),
   so the image takes most of the screen; the sheet rises in when it opens, also by itself after a fit. The start
   screen keeps all its motion on phones, and the settings no longer scroll sideways on narrow screens.
-  The three start actions are larger, and the report entry spans the width of the pair above it, on frosted glass,
-  with a link to the source under it. The line over the title reads *Input detecting…*, blinking and typing its dots,
+  The three start actions are larger; the report entry and, under it, the source on GitHub span the width of the pair
+  above them on frosted glass, and the whole block sits inside the instrument's corner brackets (on phones the
+  instrument grew for that: its rings run off the sides). The line over the title reads *Input detecting…*, blinking and typing its dots,
   with a soft glow. On computers the Enhance block now fits between the wordmark and the system buttons at every
   window width (under 1240 px those buttons shrink to their glyphs), the top Open button stays out of the start
   screen (the start screen has its own), and a short window moves the corner notes under the wordmark.

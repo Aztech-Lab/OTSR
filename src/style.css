@@ -106,10 +106,10 @@ body.empty .brand .chip { display: none; }
 @keyframes detectGlow { 50% { text-shadow: 0 0 4px color-mix(in srgb, var(--copper) 30%, transparent), 0 1px 1px color-mix(in srgb, var(--bg) 90%, transparent); } }
 body.no-motion .instrument .center .detecting { animation: none; }
 body.no-motion .instrument .center .detecting .dots::after { animation: none; content: '...'; }
-.instrument h2 { margin: 10px 0 4px; font-size: 30px; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; text-shadow: 0 2px 16px color-mix(in srgb, var(--bg) 80%, transparent); }
+.instrument h2 { margin: 8px 0 2px; font-size: 30px; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; text-shadow: 0 2px 16px color-mix(in srgb, var(--bg) 80%, transparent); }
 .instrument .zh { font-size: 13px; color: var(--muted); letter-spacing: 0.3em; }
 /* the three start actions share one column: the pair on top, the report entry under it at the same width */
-.homeacts { display: inline-grid; width: max-content; max-width: calc(100vw - 24px); grid-template-columns: 100%; margin-top: 22px; }
+.homeacts { display: inline-grid; width: max-content; max-width: calc(100vw - 24px); grid-template-columns: 100%; margin-top: 18px; }
 .homeacts .pair { display: flex; }
 .homeacts .pair .btn { flex: 1 1 auto; height: 56px; padding: 0 20px; gap: 18px; }
 .homeacts .btn .bi b, .homeacts .report .bi b { font-size: 12.5px; white-space: nowrap; }
@@ -125,15 +125,13 @@ body.no-motion .instrument .center .detecting .dots::after { animation: none; co
 .samplesel { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .samplesel select { width: 260px; padding: 4px 8px; font-size: 11px; }
 /* the technical report entry under the pair */
-.instrument .report { display: flex; margin-top: 12px; align-items: center; justify-content: space-between; gap: 14px; height: 50px; padding: 0 20px; border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; clip-path: var(--chamfer-sm); transition: color 0.15s, border-color 0.15s, background 0.15s;
+.instrument .report { display: flex; margin-top: 10px; align-items: center; justify-content: space-between; gap: 14px; height: 50px; padding: 0 20px; border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; clip-path: var(--chamfer-sm); transition: color 0.15s, border-color 0.15s, background 0.15s;
   /* frosted glass: the rings and the starlight show through, blurred */
   background: color-mix(in srgb, var(--panel-solid) 42%, transparent); backdrop-filter: blur(12px) saturate(1.4); }
 .instrument .report:hover { color: var(--copper); border-color: var(--copper); background: var(--copper-soft); }
 .instrument .report .arrow { font-size: 16px; }
-/* the source link under the report entry */
-.homeacts .repo { justify-self: center; margin-top: 12px; font: 500 10px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); text-decoration-color: color-mix(in srgb, var(--copper) 60%, transparent); }
-.homeacts .repo:hover { color: var(--copper); }
-.homeacts .repo .arrow { font-size: 11px; }
+/* the source entry under it: the same frosted glass, the same width */
+.homeacts .repo { margin-top: 10px; }
 .corner-note { position: absolute; font: 500 10px/1.6 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 .corner-note.tl { left: 6px; top: 6px; }
 .corner-note.tr { right: 6px; top: 6px; text-align: right; }
@@ -510,7 +508,7 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .navbtn .key { display: none; }
   .navbtn .glyph { display: inline; }
   .themebtn { padding: 0 11px; }
-  .instrument { top: 36%; width: min(300px, 80vw); height: min(300px, 80vw); transform: translate(-50%, -50%); }
+  .instrument { top: 36%; width: min(560px, 100vw + 120px); height: min(560px, 100vw + 120px); transform: translate(-50%, -50%); }
   /* the system check under the instrument, scrolling inside when the screen is short */
   .syscheck { left: 50%; right: auto; bottom: 12px; width: min(560px, calc(100vw - 24px)); max-height: calc(64vh - min(150px, 40vw) - 24px); transform: translateX(-50%); background: var(--panel-solid); backdrop-filter: none; clip-path: var(--chamfer-sm); }
   .syscheck .console-head { height: 28px; padding-left: 14px; }
@@ -525,13 +523,13 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   .diag { grid-template-columns: 1fr; gap: 2px; }
   .diag dd { margin-bottom: 6px; }
   .instrument h2 { font-size: 22px; }
-  .homeacts { margin-top: 18px; }
+  .homeacts { margin-top: 14px; }
   .homeacts .pair .btn { height: 52px; padding: 0 14px; gap: 12px; }
   .homeacts .btn .bi b, .homeacts .report .bi b { font-size: 12px; }
   .homeacts .btn .bi small, .homeacts .report .bi small { font-size: 10px; }
   .samplesel { margin-top: 10px; }
   .samplesel select { width: 200px; }
-  .instrument .report { margin-top: 10px; height: 48px; padding: 0 14px; }
+  .instrument .report { margin-top: 8px; height: 46px; padding: 0 14px; }
   /* the sheet: full width at the bottom, scrolling body, the title bar is the handle */
   .console { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 58vh; border-left: 0; border-right: 0; border-bottom: 0; clip-path: none; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.16); }
   .console::before, .console::after { display: none; }
@@ -631,7 +629,7 @@ body.no-motion .ring-spin, body.no-motion .ring-spin-r, body.no-motion .sq.blink
   body.left-closed .zoombar { left: 50% !important; }
   .statusbar .notice { left: calc(50% + 150px); max-width: min(420px, calc(100vw - 324px)); }
   body.left-closed .statusbar .notice { left: 50%; max-width: min(420px, calc(100vw - 24px)); }
-  .instrument { top: 50%; width: min(300px, 80vh); height: min(300px, 80vh); }
+  .instrument { top: 50%; width: min(560px, 100vh + 120px); height: min(560px, 100vh + 120px); }
   .syscheck { left: auto; right: 12px; top: 56px; bottom: 12px; width: min(300px, calc(50vw - 162px)); max-height: none; transform: none; }
   body.entering .console { animation: slideL 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   body.leaving .console { animation: slideLout 0.4s cubic-bezier(0.6, 0, 0.9, 0.4) both; }
