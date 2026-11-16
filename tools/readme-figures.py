@@ -252,7 +252,7 @@ def pipeline_svg():
     <clipPath id="left"><rect x="{x0}" y="{top}" width="100" height="200"/></clipPath>
     <clipPath id="right"><rect x="{x0 + 100}" y="{top}" width="100" height="200"/></clipPath>
     <clipPath id="frame"><polygon points="{chamfer(x0, top, 200, 200, 10)}"/></clipPath>
-    <linearGradient id="soft" gradientUnits="userSpaceOnUse" x1="{x0 + 70}" y1="{top + 130}" x2="{x0 + 130}" y2="{top + 70}"><stop offset="0" stop-color="$COPPER" stop-opacity=".67"/><stop offset="1" stop-color="$COPPER" stop-opacity=".12"/></linearGradient>
+    <linearGradient id="soft" gradientUnits="userSpaceOnUse" x1="{x0 + 70}" y1="{top + 70}" x2="{x0 + 130}" y2="{top + 130}"><stop offset="0" stop-color="$COPPER" stop-opacity=".67"/><stop offset="1" stop-color="$COPPER" stop-opacity=".12"/></linearGradient>
     <g clip-path="url(#frame)">
       <rect x="{x0}" y="{top}" width="200" height="200" fill="$COPPER" opacity=".12"/>
       <g clip-path="url(#left)"><rect x="{x0}" y="{top}" width="200" height="200" fill="url(#soft)"/>{''.join(f'<rect x="{x0 + j * 25}" y="{top + i * 25}" width="25" height="25" fill="none" stroke="$BG" stroke-width=".8" opacity=".5"/>' for i in range(8) for j in range(4))}</g>
